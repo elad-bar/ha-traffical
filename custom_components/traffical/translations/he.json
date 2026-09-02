@@ -1,0 +1,87 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Traffical",
+        "description": "התחברו עם מספר הטלפון שבו משתמשים באפליקציית Traffical.",
+        "data": {
+          "environment": "סביבה",
+          "phone": "טלפון"
+        }
+      },
+      "otp": {
+        "title": "הזינו את הקוד",
+        "description": "קוד חד-פעמי נשלח ב-SMS.",
+        "data": {
+          "otp": "קוד OTP"
+        }
+      },
+      "reauth_confirm": {
+        "title": "התחברו מחדש",
+        "description": "קוד חדש נשלח אל {phone}.",
+        "data": {
+          "otp": "קוד OTP"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "ההתחברות נכשלה. בדקו את מספר הטלפון או את קוד ה-OTP.",
+      "cannot_connect": "לא ניתן להתחבר ל-Traffical.",
+      "unknown": "שגיאה לא צפויה."
+    },
+    "abort": {
+      "already_configured": "חשבון Traffical זה כבר מוגדר.",
+      "cannot_connect": "לא ניתן להתחבר ל-Traffical."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "אפשרויות Traffical",
+        "data": {
+          "poll_interval": "מרווח דגימה (שניות)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_ride": { "name": "הנסיעה הבאה" },
+      "status": { "name": "סטטוס" },
+      "my_station": { "name": "התחנה שלי" },
+      "destination": { "name": "יעד" },
+      "driver": { "name": "נהג" },
+      "vehicle": { "name": "רכב" }
+    },
+    "binary_sensor": {
+      "checked_in": { "name": "נרשמו" }
+    },
+    "button": {
+      "refresh": { "name": "רענון" },
+      "check_in": { "name": "רישום עלייה" },
+      "check_out": { "name": "רישום ירידה" },
+      "not_coming": { "name": "לא מגיעים" }
+    },
+    "select": {
+      "child": { "name": "ילד" }
+    },
+    "device_tracker": {
+      "bus": { "name": "אוטובוס" }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "ride_status_changed": "סטטוס הנסיעה השתנה",
+      "ride_started": "הנסיעה החלה",
+      "ride_finished": "הנסיעה הסתיימה",
+      "checkin_changed": "הרישום השתנה",
+      "arrived_station": "הגיע לתחנה",
+      "approaching_stop": "מתקרב לתחנה"
+    }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "לא ניתן להתחבר ל-Traffical."
+    }
+  }
+}

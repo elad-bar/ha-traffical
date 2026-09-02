@@ -18,7 +18,7 @@ and _confirmed vs inferred_ matter most, because wrong ride state silently lies 
 
 UI strings are in [`custom_components/traffical/strings.json`](custom_components/traffical/strings.json)
 (English source) and [`custom_components/traffical/translations/`](custom_components/traffical/translations/)
-(one JSON file per HA locale). Phase A ships **English only**. Brand **Traffical** stays untranslated.
+(one JSON file per HA locale). Shipped locales: English (`en`) and Hebrew (`he`). Brand **Traffical** stays untranslated.
 
 When you add or change copy in `strings.json` / `translations/en.json`, or you add a locale, follow the Cursor skill [`.cursor/skills/translate-locales/`](.cursor/skills/translate-locales/). When translation tests exist, run `pytest tests/test_translations.py`.
 

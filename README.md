@@ -109,7 +109,7 @@ Requires packages from [`requirements.txt`](requirements.txt).
 Config flow text follows **Settings → System → General → Language**.
 Shipped UI translations live under
 [`custom_components/traffical/translations/`](custom_components/traffical/translations/).
-Phase A includes English only; other languages fall back to English.
+English and Hebrew are shipped; other languages fall back to English.
 
 Brand **Traffical** is not translated.
 
