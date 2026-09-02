@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import logging
-import math
 from collections.abc import Callable
 from datetime import date, datetime, timedelta, timezone
+import logging
+import math
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -32,6 +32,7 @@ from ..common.helpers import client_session, parse_utc, partial_id
 from ..models.exceptions import ApiError, AuthError
 from ..models.rides import (
     coord_from_payload,
+    focus_ride_key,
     is_your_station,
     list_row_ids,
     list_row_route_key,
@@ -96,6 +97,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "children": [],
             "session_ok": False,
             "live_key": None,
+            "focus_ride_key": None,
         }
         self.identity.on_unauthorized = self._on_unauthorized
         self.mobile.on_unauthorized = self._on_unauthorized
@@ -138,7 +140,9 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.hubs.stop_track()
         await self._session.close()
 
-    def register_entity_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
+    def register_entity_listener(
+        self, listener: Callable[[], None]
+    ) -> Callable[[], None]:
         self._ride_listener = listener
 
         def _unsub() -> None:
@@ -179,7 +183,9 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._reauth_started:
             return
         self._reauth_started = True
-        _LOGGER.error(f"starting reauth flow entry_id={partial_id(self.entry.entry_id)}")
+        _LOGGER.error(
+            f"starting reauth flow entry_id={partial_id(self.entry.entry_id)}"
+        )
         self.entry.async_start_reauth(self.hass)
 
     async def _async_update_data(self) -> dict[str, Any]:
@@ -291,7 +297,9 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._emit_checkin(key, old.get("checkin"), check, ride_id)
             if status_live(status):
                 live_key = key
-        _LOGGER.info(f"ride list refreshed count={sum(1 for r in rides.values() if r.get('assigned_today'))}")
+        _LOGGER.info(
+            f"ride list refreshed count={sum(1 for r in rides.values() if r.get('assigned_today'))}"
+        )
         self._adjust_interval(rides)
         data = {
             "rides": rides,
@@ -300,6 +308,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "children": children,
             "session_ok": True,
             "live_key": live_key,
+            "focus_ride_key": focus_ride_key(rides),
         }
         self.data = data
         self._register_devices()
@@ -347,17 +356,15 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if status_live(new_status) and not status_live(old_status):
             self.hass.bus.async_fire(
                 EVENT_RIDE_STARTED,
-                {"ride_id": ride_id, "name": ride_name(row, details)},
+                {"ride_id": ride_id, "name": ride_name(row, details), "key": key},
             )
         if status_finished(new_status) and not status_finished(old_status):
             self.hass.bus.async_fire(
                 EVENT_RIDE_FINISHED,
-                {"ride_id": ride_id, "checked_in": None},
+                {"ride_id": ride_id, "checked_in": None, "key": key},
             )
 
-    def _emit_checkin(
-        self, key: str, old: Any, new: Any, ride_id: int | None
-    ) -> None:
+    def _emit_checkin(self, key: str, old: Any, new: Any, ride_id: int | None) -> None:
         old_flag = old.get("checkIn") if isinstance(old, dict) else None
         new_flag = new.get("checkIn") if isinstance(new, dict) else None
         if new is None or new_flag == old_flag:
@@ -470,6 +477,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "ride_id": ride.get("ride_id"),
                     "station_id": sid,
                     "is_my_station": is_mine,
+                    "key": live_key,
                 },
             )
             self.async_set_updated_data(self.data)
@@ -490,7 +498,11 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ride["approaching_fired"] = True
         self.hass.bus.async_fire(
             EVENT_APPROACHING_STOP,
-            {"ride_id": ride.get("ride_id"), "distance_m": int(distance)},
+            {
+                "ride_id": ride.get("ride_id"),
+                "distance_m": int(distance),
+                "key": key,
+            },
         )
 
     def _home_station(self, ride: dict[str, Any]) -> tuple[float, float] | None:

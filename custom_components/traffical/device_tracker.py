@@ -54,4 +54,6 @@ class TrafficalBusTracker(TrafficalEntity, TrackerEntity):
         if not super().available or not self.ride_key:
             return False
         ride = self.coordinator.ride(self.ride_key)
-        return status_live(str(ride.get("status") or "")) and ride.get("lat") is not None
+        return (
+            status_live(str(ride.get("status") or "")) and ride.get("lat") is not None
+        )

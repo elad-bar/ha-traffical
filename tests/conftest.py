@@ -11,12 +11,13 @@ import sys
 
 import pytest
 
-# Phase B: HA plugin tests (config flow, coordinator, setup/unload).
+# Phase B: HA plugin tests (config flow, coordinator, setup/unload, device triggers).
 _HASS_TEST_FILES = frozenset(
     {
         "test_config_flow.py",
         "test_coordinator.py",
         "test_setup_unload.py",
+        "test_device_trigger.py",
     }
 )
 

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import importlib
-import re
 from pathlib import Path
+import re
 import sys
 
 import pytest
@@ -38,18 +38,14 @@ def test_ha_free_modules_import_without_homeassistant() -> None:
     had_ha = "homeassistant" in sys.modules
     _mount_ha_free()
     before = {
-        k
-        for k in sys.modules
-        if k == "homeassistant" or k.startswith("homeassistant.")
+        k for k in sys.modules if k == "homeassistant" or k.startswith("homeassistant.")
     }
     for mod_name in _HA_FREE_MODULES:
         mod = importlib.import_module(mod_name)
         assert mod is not None
         assert "custom_components" in (mod.__file__ or "").replace("\\", "/")
     after = {
-        k
-        for k in sys.modules
-        if k == "homeassistant" or k.startswith("homeassistant.")
+        k for k in sys.modules if k == "homeassistant" or k.startswith("homeassistant.")
     }
     assert after == before or had_ha
     newly = after - before

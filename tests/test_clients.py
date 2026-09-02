@@ -13,6 +13,7 @@ from custom_components.traffical.managers.mobile_client import MobileClient
 from custom_components.traffical.managers.signalr_client import _parse_hub_args
 from custom_components.traffical.managers.store import SessionStore
 from custom_components.traffical.models.rides import (
+    focus_ride_key,
     ride_device_key,
     rides_customer_type,
     status_live,
@@ -32,6 +33,49 @@ def test_customer_type_municipality() -> None:
 def test_status_live() -> None:
     assert status_live("OngoingMonitored")
     assert not status_live("New")
+
+
+def test_focus_ride_key_live_beats_finished() -> None:
+    rides = {
+        "392681:120": {
+            "assigned_today": True,
+            "status": "FinishedMonitored",
+            "details": {"startTime": "2026-09-02T05:00:00Z"},
+        },
+        "428988:121": {
+            "assigned_today": True,
+            "status": "Ongoing",
+            "details": {"startTime": "2026-09-02T13:00:00Z"},
+        },
+    }
+    assert focus_ride_key(rides) == "428988:121"
+
+
+def test_focus_ride_key_next_unfinished() -> None:
+    rides = {
+        "392681:120": {
+            "assigned_today": True,
+            "status": "Finished",
+            "details": {"startTime": "2026-09-02T05:00:00Z"},
+        },
+        "428988:121": {
+            "assigned_today": True,
+            "status": "New",
+            "details": {"startTime": "2026-09-02T13:00:00Z"},
+        },
+    }
+    assert focus_ride_key(rides) == "428988:121"
+
+
+def test_focus_ride_key_all_finished() -> None:
+    rides = {
+        "392681:120": {
+            "assigned_today": True,
+            "status": "FinishedMonitored",
+            "details": {"startTime": "2026-09-02T05:00:00Z"},
+        }
+    }
+    assert focus_ride_key(rides) is None
 
 
 def test_pkce_and_mask() -> None:
@@ -58,7 +102,9 @@ def test_store_tokens(tmp_path) -> None:
 
 
 class _FakeResp:
-    def __init__(self, status: int, payload: object, headers: dict | None = None) -> None:
+    def __init__(
+        self, status: int, payload: object, headers: dict | None = None
+    ) -> None:
         self.status = status
         self._payload = payload
         self.headers = headers or {}

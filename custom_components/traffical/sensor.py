@@ -13,7 +13,7 @@ from .common.base_entity import TrafficalEntity
 from .common.entity_descriptions import HUB_SENSORS, RIDE_SENSORS
 from .common.entity_setup import async_setup_entities
 from .managers.coordinator import TrafficalCoordinator
-from .models.rides import is_your_station, status_live
+from .models.rides import is_your_station
 
 PARALLEL_UPDATES = 1
 
@@ -89,12 +89,11 @@ class TrafficalSensor(TrafficalEntity, SensorEntity):
         return {}
 
     def _next_ride_obj(self) -> dict[str, Any] | None:
-        rides = list((self.coordinator.data or {}).get("rides") or {}.values())
-        live = [r for r in rides if r.get("assigned_today") and status_live(str(r.get("status") or ""))]
-        if live:
-            return live[0]
-        assigned = [r for r in rides if r.get("assigned_today")]
-        return assigned[0] if assigned else None
+        key = (self.coordinator.data or {}).get("focus_ride_key")
+        if not key:
+            return None
+        ride = self.coordinator.ride(str(key))
+        return ride or None
 
     def _next_ride(self) -> str | None:
         ride = self._next_ride_obj()

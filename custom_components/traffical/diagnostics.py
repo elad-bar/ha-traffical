@@ -44,5 +44,6 @@ async def async_get_config_entry_diagnostics(
         "hub_id": coordinator.hub_id,
         "session_ok": (coordinator.data or {}).get("session_ok"),
         "live_key": (coordinator.data or {}).get("live_key"),
+        "focus_ride_key": (coordinator.data or {}).get("focus_ride_key"),
         "rides": rides,
     }

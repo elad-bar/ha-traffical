@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from ..common.consts import (
@@ -10,6 +11,7 @@ from ..common.consts import (
     STATUS_FINISHED,
     STATUS_LIVE,
 )
+from ..common.helpers import parse_utc
 
 
 def rides_customer_type(customer_type_id: Any) -> str:
@@ -37,6 +39,38 @@ def status_finished(status: str) -> bool:
     return str(status or "").casefold() in STATUS_FINISHED
 
 
+def _ride_start(ride: dict[str, Any]) -> datetime | None:
+    details = ride.get("details") if isinstance(ride.get("details"), dict) else {}
+    row = ride.get("list_row") if isinstance(ride.get("list_row"), dict) else {}
+    info = row.get("rideInfo") if isinstance(row.get("rideInfo"), dict) else {}
+    return parse_utc(details.get("startTime") or info.get("startDateTime"))
+
+
+def focus_ride_key(rides: dict[str, Any]) -> str | None:
+    """Live ride, else earliest unfinished assigned ride today."""
+    assigned: list[tuple[str, dict[str, Any]]] = []
+    for key, ride in rides.items():
+        if isinstance(ride, dict) and ride.get("assigned_today"):
+            assigned.append((key, ride))
+    for key, ride in assigned:
+        if status_live(str(ride.get("status") or "")):
+            return key
+    upcoming = [
+        (key, ride)
+        for key, ride in assigned
+        if not status_finished(str(ride.get("status") or ""))
+    ]
+    if not upcoming:
+        return None
+    far = datetime(9999, 12, 31, tzinfo=timezone.utc)
+
+    def _sort_start(item: tuple[str, dict[str, Any]]) -> datetime:
+        return _ride_start(item[1]) or far
+
+    upcoming.sort(key=_sort_start)
+    return upcoming[0][0]
+
+
 def list_row_ids(row: dict[str, Any]) -> tuple[str, int | None]:
     info = row.get("rideInfo") if isinstance(row.get("rideInfo"), dict) else {}
     ticket = str(info.get("rideTicket") or row.get("rideTicket") or "")
@@ -48,11 +82,15 @@ def list_row_ids(row: dict[str, Any]) -> tuple[str, int | None]:
     return ticket, ride_id
 
 
-def list_row_route_key(row: dict[str, Any], details: dict[str, Any] | None) -> str | None:
+def list_row_route_key(
+    row: dict[str, Any], details: dict[str, Any] | None
+) -> str | None:
     info = row.get("rideInfo") if isinstance(row.get("rideInfo"), dict) else {}
     details = details if isinstance(details, dict) else {}
     route_id = details.get("routeId") or info.get("routeId") or row.get("routeId")
-    direction = details.get("direction") or info.get("direction") or row.get("direction")
+    direction = (
+        details.get("direction") or info.get("direction") or row.get("direction")
+    )
     return ride_device_key(route_id, direction)
 
 

@@ -59,7 +59,5 @@ class TrafficalChildSelect(TrafficalEntity, SelectEntity):
                 return
 
     def _label(self, child: dict) -> str:
-        name = " ".join(
-            p for p in (child.get("firstName"), child.get("lastName")) if p
-        )
+        name = " ".join(p for p in (child.get("firstName"), child.get("lastName")) if p)
         return name or str(child.get("memberId"))

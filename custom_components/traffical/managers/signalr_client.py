@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 import json
 import logging
-from collections.abc import Awaitable, Callable
 from typing import Any
 from urllib.parse import urlencode, urlparse, urlunparse
 

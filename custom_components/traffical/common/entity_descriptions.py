@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 HUB_SENSORS = ("next_ride",)
-HUB_BINARY = ("session",)
+HUB_BINARY = ()
 HUB_BUTTONS = ("refresh",)
 RIDE_SENSORS = ("status", "my_station", "destination", "driver", "vehicle")
 RIDE_BINARY = ("checked_in",)

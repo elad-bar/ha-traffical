@@ -64,9 +64,11 @@ One device per config entry (e.g. “Traffical · הכפר הירוק”, or par
 
 Entities on the hub only:
 
-- `select.traffical_child`
-- `button.traffical_refresh`
-- `sensor.traffical_next_ride`, `binary_sensor.traffical_session`, policy diagnostics
+- Child select
+- Refresh button
+- Next ride sensor
+
+Session health is internal (`session_ok`): entities go unavailable and reauth starts when refresh fails. There is no session binary sensor.
 
 ### Ride devices (one per recurring ride)
 
@@ -86,7 +88,7 @@ Entities on each ride device:
 - Status, check-in, driver, vehicle
 - Check-in / check-out / not coming buttons
 - Bus `device_tracker`
-- Station `geo_location`s and the two passive zones
+- Station `geo_location`s (shown only for the focus ride: live, else next unfinished today)
 
 **No assignment today** (weekend, holiday, not coming, empty list): the ride device stays in the registry and goes **unavailable**. Do not delete and recreate it.
 
@@ -132,11 +134,8 @@ Unavailable buttons stay on the device and are greyed out (`available = False`).
 | `sensor.traffical_{ride}_destination` | Destination **name** (`isTarget` stations keep `name`; expose `address` as an attribute) and scheduled arrival |
 | `sensor.traffical_{ride}_driver` | Name / mobile when assigned (often empty until close to departure) |
 | `sensor.traffical_{ride}_vehicle` | Plate, type, shuttle company |
-| `binary_sensor.traffical_session` | Token refresh healthy |
 
 Optional: delay vs schedule, progress along stations, “approaching my stop”. Policy flags can live as attributes on the **hub** so automations can `condition` on `got_on` / `not_coming`.
-
-Ride **calendar** (`calendar.traffical_rides`) is useful: one event per ride using `startDateTime` / `endDateTime` and station as location.
 
 ---
 
@@ -154,7 +153,7 @@ Ride **calendar** (`calendar.traffical_rides`) is useful: one event per ride usi
 
 Stations are not extra `device_tracker`s (they do not move) and not a **normal** HA zone per stop (that would steal “in zone” from people and from the bus).
 
-One `geo_location.traffical_{ride}_stop_{station_id}` per station on that ride device (today’s path). They show on the default Map. Friendly name is the station **address** (it matches `lat`/`lng`); keep `name` as an extra attribute because it is often a stale dispatcher label. For `isTarget` stations, prefer **name** (school / activity) and keep `address` as an attribute. Icon and color depend on **role** and **progress**:
+One `geo_location` per station on that ride device (today’s path). They show on the default Map **only for the focus ride**: a live `Ongoing*` ride if any, otherwise the next unfinished assigned ride today (earliest start). Finished / earlier same-day rides keep their markers in the registry but unavailable. After the last ride finishes, no station pins. Friendly name is the station **address** (it matches `lat`/`lng`); keep `name` as an extra attribute because it is often a stale dispatcher label. For `isTarget` stations, prefer **name** (school / activity) and keep `address` as an attribute. Icon and color depend on **role** and **progress**:
 
 | Kind | Detection | Icon (example) | Color |
 |------|-----------|----------------|-------|
@@ -168,20 +167,11 @@ If home and target are the same stop, prefer the **home** icon when it is *your*
 **Direction**
 
 - Morning (e.g. `direction` 120): home = pickup, target = school.
-- Afternoon (e.g. `direction` 121): school is **start** (`isTarget` on the first station); home is **drop-off**. Target zone/marker is still school; home marker is still the passenger stop.
+- Afternoon (e.g. `direction` 121): school is **start** (`isTarget` on the first station); home is **drop-off**. Target marker is still school; home marker is still the passenger stop.
 
-When the trip is not live (evening / next morning before the list loads), hide or **unavailable** the station markers so they do not clutter the map. Keep the **ride device**. Station ids may change; recreate markers as needed, still attached to the same ride device.
+When there is no focus ride (evening / all finished / list empty), hide or **unavailable** the station markers so they do not clutter the map. Keep the **ride device**. Station ids may change; recreate markers as needed, still attached to the same ride device.
 
-### Two passive zones (automations)
-
-Passive zones appear on the map but **do not** change `person` / phone location:
-
-| Zone | Meaning | Radius |
-|------|---------|--------|
-| `zone.traffical_{ride}_home_stop` | Passenger’s assigned stop | ~60–80 m |
-| `zone.traffical_{ride}_target` | School / route target | ~60–80 m |
-
-The bus tracker entering `zone.traffical_*_home_stop` is the “van at our stop” trigger. Do **not** create a zone per intermediate stop.
+Do **not** create HA `zone` entities. Station `geo_location`s are the map pins; “van at our stop” is `traffical_approaching_stop` (or the same device trigger on the ride device).
 
 ---
 
@@ -191,21 +181,21 @@ Prefer HA events for transitions that should not thrash sensors:
 
 | Event | When | Data |
 |-------|------|------|
-| `traffical_ride_status_changed` | List poll / status change | `ride_id`, `old`, `new`, `direction` |
-| `traffical_ride_started` | First transition into `Ongoing*` | `ride_id`, `name` |
-| `traffical_ride_finished` | `Finished*` | `ride_id`, `checked_in` |
-| `traffical_checkin_changed` | `checkIn` flips | `ride_id`, `check_in`, `check_in_at` |
-| `traffical_arrived_station` | SignalR `ArrivedToStation` | `ride_id`, `station_id`, `is_my_station` |
-| `traffical_approaching_stop` | GPS vs home station | `ride_id`, `distance_m` |
+| `traffical_ride_status_changed` | List poll / status change | `ride_id`, `old`, `new`, `direction`, `key` |
+| `traffical_ride_started` | First transition into `Ongoing*` | `ride_id`, `name`, `key` |
+| `traffical_ride_finished` | `Finished*` | `ride_id`, `checked_in`, `key` |
+| `traffical_checkin_changed` | `checkIn` flips | `ride_id`, `check_in`, `check_in_at`, `key` |
+| `traffical_arrived_station` | SignalR `ArrivedToStation` | `ride_id`, `station_id`, `is_my_station`, `key` |
+| `traffical_approaching_stop` | GPS vs home station | `ride_id`, `distance_m`, `key` |
 
-Do not fire a bus event on every coordinate tick.
+`key` is the stable ride device id (`routeId:direction`). Device triggers on the **ride** device wrap the same events (Automations → Device). Raw Event triggers still work. Do not fire a bus event on every coordinate tick.
 
 ---
 
 ## Example automations
 
 - Lights / TTS **20–30 min** before `passengerStationArrivalDateTime`
-- Notify when the bus enters the **passive home-stop zone**, or `traffical_approaching_stop`
+- Notify on `traffical_approaching_stop` (or the ride-device trigger **Approaching stop**)
 - Notify when `driver` goes from empty to a name
 - Dashboard: check-in button while live and not checked in
 - Alert if still not checked in after the home/school station has `actualArriveDateTime`

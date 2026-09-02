@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 import json
 import logging
-from collections.abc import Awaitable, Callable
 from typing import Any
 
 import aiohttp
@@ -81,9 +81,7 @@ class ApiClient:
     async def _read_text(self, resp: aiohttp.ClientResponse) -> str:
         return await resp.text()
 
-    def _raise_for_status(
-        self, status: int, action: str, body: str | None
-    ) -> None:
+    def _raise_for_status(self, status: int, action: str, body: str | None) -> None:
         if status >= 400:
             raise ApiError(
                 f"{action} failed ({status})",
@@ -117,9 +115,7 @@ class ApiClient:
         while True:
             headers = self.headers(extra_headers, auth=auth)
             if form is not None:
-                headers.setdefault(
-                    "Content-Type", "application/x-www-form-urlencoded"
-                )
+                headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
             _LOGGER.debug(f"{method} {path}")
             try:
                 async with self.session.request(

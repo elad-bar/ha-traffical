@@ -133,5 +133,6 @@ async def test_coordinator_ride_key_not_daily_id(hass: HomeAssistant) -> None:
             assert ride["ride_id"] == 39306112
             assert ride["assigned_today"] is True
             assert coordinator.policy_active("gotOnRideReport")
+            assert coordinator.data["focus_ride_key"] == key
         finally:
             await coordinator.async_stop()

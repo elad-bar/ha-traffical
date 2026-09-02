@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
+from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -39,15 +36,7 @@ async def async_setup_entry(
 
 class TrafficalBinarySensor(TrafficalEntity, BinarySensorEntity):
     @property
-    def device_class(self) -> BinarySensorDeviceClass | None:
-        if self.entity_key == "session":
-            return BinarySensorDeviceClass.CONNECTIVITY
-        return None
-
-    @property
     def is_on(self) -> bool | None:
-        if self.entity_key == "session":
-            return bool((self.coordinator.data or {}).get("session_ok"))
         ride = self.coordinator.ride(self.ride_key or "")
         check = ride.get("checkin")
         if not isinstance(check, dict) or check.get("checkIn") is None:

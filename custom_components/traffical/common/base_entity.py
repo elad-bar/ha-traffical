@@ -6,7 +6,6 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ..managers.coordinator import TrafficalCoordinator
-from .consts import DOMAIN
 
 
 class TrafficalEntity(CoordinatorEntity[TrafficalCoordinator]):

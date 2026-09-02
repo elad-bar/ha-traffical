@@ -54,7 +54,6 @@
       "vehicle": { "name": "Vehicle" }
     },
     "binary_sensor": {
-      "session": { "name": "Session" },
       "checked_in": { "name": "Checked in" }
     },
     "button": {
@@ -68,6 +67,16 @@
     },
     "device_tracker": {
       "bus": { "name": "Bus" }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "ride_status_changed": "Ride status changed",
+      "ride_started": "Ride started",
+      "ride_finished": "Ride finished",
+      "checkin_changed": "Check-in changed",
+      "arrived_station": "Arrived at station",
+      "approaching_stop": "Approaching stop"
     }
   },
   "exceptions": {

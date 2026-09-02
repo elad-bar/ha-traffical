@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .common.base_entity import TrafficalEntity
 from .common.consts import DOMAIN
 from .managers.coordinator import TrafficalCoordinator
-from .models.rides import is_your_station, station_id, status_live
+from .models.rides import is_your_station, station_id
 
 PARALLEL_UPDATES = 1
 
@@ -77,9 +77,8 @@ class TrafficalStop(TrafficalEntity, GeolocationEvent):
         if not super().available:
             return False
         ride = self.coordinator.ride(self.ride_key or "")
-        return bool(ride.get("assigned_today")) and status_live(
-            str(ride.get("status") or "")
-        )
+        focus = (self.coordinator.data or {}).get("focus_ride_key")
+        return bool(ride.get("assigned_today")) and self.ride_key == focus
 
     def _station(self) -> dict[str, Any]:
         ride = self.coordinator.ride(self.ride_key or "")
