@@ -50,6 +50,8 @@ No track / stop buttons or services. Same idea as engine auto-track:
 
 If two rides were live, one dashboard hub at a time is enough; attach to the live ride.
 
+Home Assistant has no SignalR helper. The hub client is ours (HA-free `managers/`). Prefer async SignalR on the event loop (`aiohttp` session); if the client is still sync (`signalrcore`), marshal callbacks onto the loop before updating entities. Stack and constraints: [coding.md](./standards/coding.md).
+
 ---
 
 ## Devices
@@ -246,7 +248,7 @@ On HA start / entry setup: load entry → if `refresh_token` exists, `grant_type
 
 Refresh before `obtained_at + expires_in`, and on 401 from mobile/`userinfo`. If refresh returns 200, update entry data and continue. Entities stay available.
 
-Token refresh and SignalR run in an executor if the client stays sync (`signalrcore`).
+Token refresh and SignalR run as `await`s when the clients are async. If a spike still uses sync `signalrcore` / `requests`, run that I/O in an executor and never write entity state from the hub thread (see [coding.md](./standards/coding.md)).
 
 ### Reauth (OTP again)
 

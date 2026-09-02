@@ -109,7 +109,7 @@ Product target: [home-assistant-integration.md](./home-assistant-integration.md)
 
 ### B2. HTTP / realtime stack
 
-- [ ] Decide aiohttp as the long-term stack (Carlinko invariant) vs keep `requests` / `signalrcore` until a working SignalR-on-aiohttp path exists
+- [ ] Choose the HTTP / SignalR stack: target is `aiohttp` REST + an **async** hub client we own (thin negotiate + `ws_connect`, or a Core SignalR library proven on Live). HA has no SignalR SDK. `signalrcore` + executor is a spike only, not the long-term stack. Details: [coding.md](./standards/coding.md)
 - [ ] Timeouts explicit; session owned at coordinator / engine boundary
 - [ ] `python-dotenv` engine-only; HA credentials from the config entry
 - [ ] Update `requirements.txt` to match the chosen stack
@@ -154,7 +154,8 @@ Product target: [home-assistant-integration.md](./home-assistant-integration.md)
 
 ## Progress log
 
-| Date       | Phase | Note                                                                   |
-| ---------- | ----- | ---------------------------------------------------------------------- |
-| 2026-09-02 | —     | Research complete; this checklist created. No scaffolding applied yet. |
-| 2026-09-02 | A     | Stub integration, CI, standards, skills. Engine clients unchanged.     |
+| Date       | Phase | Note                                                                       |
+| ---------- | ----- | -------------------------------------------------------------------------- |
+| 2026-09-02 | —     | Research complete; this checklist created. No scaffolding applied yet.     |
+| 2026-09-02 | A     | Stub integration, CI, standards, skills. Engine clients unchanged.         |
+| 2026-09-02 | B     | Docs: HA has no SignalR SDK; Phase B target is async hub client + aiohttp. |

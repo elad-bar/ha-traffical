@@ -24,8 +24,8 @@ rules:
   appropriate-polling:
     status: todo
     comment: >-
-      Stub only. Target is cloud_polling HTTP (rides / check-in / details)
-      with automatic SignalR while a ride is Ongoing.
+      Stub only. iot_class stays cloud_polling: HTTP is the source of ride /
+      check-in truth; SignalR is a live overlay while a ride is Ongoing.
 
   discovery:
     status: exempt
