@@ -16,70 +16,70 @@ Tooling, standards, skills, folders, and a **stub** integration so CI can run. D
 
 ### A1. Standards and skills
 
-- [ ] Add `docs/standards/coding.md` (layers, HA-free boundary, `custom_components/traffical/`). Note **current vs target** for `engine/` and `requests` / `signalrcore`.
-- [ ] Add `docs/standards/testing.md` (pytest from repo root, Windows/`fcntl` skips, intended test map).
-- [ ] Add `docs/standards/ci.md` (jobs, release from manifest + CHANGELOG).
-- [ ] Add `docs/logging.md` adapted from Carlinko (levels, redaction: OTP, tokens, phone, child names, GPS at INFO).
-- [ ] Add `.cursor/skills/add-feature/SKILL.md` (Traffical docs; no opcodes / VIN / car-region).
-- [ ] Add `.cursor/skills/fix-bug/SKILL.md` (logger `custom_components.traffical`).
-- [ ] Add `.cursor/skills/translate-locales/SKILL.md` (paths under `custom_components/traffical/`; brand **Traffical** untranslated).
-- [ ] Add `.cursor/skills/changelog-version/SKILL.md` (`custom_components/traffical/manifest.json`).
-- [ ] Add `CONTRIBUTING.md` (passenger/parent, OTP, translations, standards links — not Carlinko cars).
+- [x] Add `docs/standards/coding.md` (layers, HA-free boundary, `custom_components/traffical/`). Note **current vs target** for `engine/` and `requests` / `signalrcore`.
+- [x] Add `docs/standards/testing.md` (pytest from repo root, Windows/`fcntl` skips, intended test map).
+- [x] Add `docs/standards/ci.md` (jobs, release from manifest + CHANGELOG).
+- [x] Add `docs/logging.md` adapted from Carlinko (levels, redaction: OTP, tokens, phone, child names, GPS at INFO).
+- [x] Add `.cursor/skills/add-feature/SKILL.md` (Traffical docs; no opcodes / VIN / car-region).
+- [x] Add `.cursor/skills/fix-bug/SKILL.md` (logger `custom_components.traffical`).
+- [x] Add `.cursor/skills/translate-locales/SKILL.md` (paths under `custom_components/traffical/`; brand **Traffical** untranslated).
+- [x] Add `.cursor/skills/changelog-version/SKILL.md` (`custom_components/traffical/manifest.json`).
+- [x] Add `CONTRIBUTING.md` (passenger/parent, OTP, translations, standards links — not Carlinko cars).
 
 ### A2. Folders
 
-- [ ] `custom_components/traffical/common/` (`__init__.py`)
-- [ ] `custom_components/traffical/managers/` (`__init__.py`)
-- [ ] `custom_components/traffical/models/` (`__init__.py`)
-- [ ] `custom_components/traffical/translations/`
-- [ ] `tests/` (`__init__.py`)
-- [ ] `scripts/`
-- [ ] `.github/workflows/`
-- [ ] `.github/ISSUE_TEMPLATE/`
-- [ ] `.cursor/skills/` (four skill dirs above)
+- [x] `custom_components/traffical/common/` (`__init__.py`)
+- [x] `custom_components/traffical/managers/` (`__init__.py`)
+- [x] `custom_components/traffical/models/` (`__init__.py`)
+- [x] `custom_components/traffical/translations/`
+- [x] `tests/` (`__init__.py`)
+- [x] `scripts/`
+- [x] `.github/workflows/`
+- [x] `.github/ISSUE_TEMPLATE/`
+- [x] `.cursor/skills/` (four skill dirs above)
 
 ### A3. Stub integration (required for hassfest / HACS)
 
-- [ ] `manifest.json` — `domain: traffical`, `config_flow: true`, `iot_class: cloud_polling`, docs/issues URLs, `loggers: ["custom_components.traffical"]`, version `0.1.0`
-- [ ] `__init__.py` — setup / unload stub
-- [ ] `config_flow.py` — user-step placeholder
-- [ ] `strings.json` + `translations/en.json`
-- [ ] `quality_scale.yaml` (parity with Carlinko, optional but useful)
-- [ ] `CHANGELOG.md` with `## [0.1.0]` (Keep a Changelog)
-- [ ] `hacs.json` — `"name": "Traffical"`
-- [ ] Do **not** copy Carlinko `sensor.py` / `lock.py` / blob models
+- [x] `manifest.json` — `domain: traffical`, `config_flow: true`, `iot_class: cloud_polling`, docs/issues URLs, `loggers: ["custom_components.traffical"]`, version `0.1.0`
+- [x] `__init__.py` — setup / unload stub
+- [x] `config_flow.py` — user-step placeholder
+- [x] `strings.json` + `translations/en.json`
+- [x] `quality_scale.yaml` (parity with Carlinko, optional but useful)
+- [x] `CHANGELOG.md` with `## [0.1.0]` (Keep a Changelog)
+- [x] `hacs.json` — `"name": "Traffical"`
+- [x] Do **not** copy Carlinko `sensor.py` / `lock.py` / blob models
 
 ### A4. CI, pre-commit, repo config
 
-- [ ] `.github/workflows/ci.yml` — pre-commit, hassfest, HACS, pytest, release; paths `custom_components/traffical/manifest.json`; title `Traffical v…`
-- [ ] `.pre-commit-config.yaml` — **exclude `engine/`** from Black/flake8 until Phase B
-- [ ] `pyproject.toml` (Black, isort, pytest)
-- [ ] `setup.cfg` (flake8)
-- [ ] `bandit.yaml`
-- [ ] `.yamllint`
-- [ ] `.prettierignore`
-- [ ] `requirements-dev.txt` (`pre-commit`, pytest, `pytest-homeassistant-custom-component`, `deep-translator` if translation scripts land)
-- [ ] `scripts/extract_changelog_section.py`
-- [ ] `.github/CODEOWNERS` — `custom_components/traffical/ @elad-bar`
-- [ ] `CODE_OF_CONDUCT.md` (passenger / child / location privacy, not VIN)
-- [ ] `LICENSE` (same as Carlinko if desired)
-- [ ] GitHub PR template; bug / feature issue templates; replace car compatibility with tenant / customer-type; `config.yml` discussions URL
-- [ ] `.vscode/settings.json` — `extraPaths` only; **no** machine-specific interpreter. Stop ignoring `.vscode/` in `.gitignore` if committed.
-- [ ] Merge `.gitignore`: keep `/app/`, `/data/`, `/debug/`; add `.env`; drop `.vscode/` ignore if committing settings
-- [ ] `README.md` — Traffical HACS / install (repo has none today)
-- [ ] `requirements.txt` — keep engine deps (`requests`, `signalrcore`); add `homeassistant` for IDE/CI if matching Carlinko
+- [x] `.github/workflows/ci.yml` — pre-commit, hassfest, HACS, pytest, release; paths `custom_components/traffical/manifest.json`; title `Traffical v…`
+- [x] `.pre-commit-config.yaml` — **exclude `engine/`** from Black/flake8 until Phase B
+- [x] `pyproject.toml` (Black, isort, pytest)
+- [x] `setup.cfg` (flake8)
+- [x] `bandit.yaml`
+- [x] `.yamllint`
+- [x] `.prettierignore`
+- [x] `requirements-dev.txt` (`pre-commit`, pytest, `pytest-homeassistant-custom-component`, `deep-translator` if translation scripts land)
+- [x] `scripts/extract_changelog_section.py`
+- [x] `.github/CODEOWNERS` — `custom_components/traffical/ @elad-bar`
+- [x] `CODE_OF_CONDUCT.md` (passenger / child / location privacy, not VIN)
+- [x] `LICENSE` (same as Carlinko if desired)
+- [x] GitHub PR template; bug / feature issue templates; replace car compatibility with tenant / customer-type; `config.yml` discussions URL
+- [x] `.vscode/settings.json` — `extraPaths` only; **no** machine-specific interpreter. Stop ignoring `.vscode/` in `.gitignore` if committed.
+- [x] Merge `.gitignore`: keep `/app/`, `/data/`, `/debug/`; add `.env`; drop `.vscode/` ignore if committing settings
+- [x] `README.md` — Traffical HACS / install (repo has none today)
+- [x] `requirements.txt` — keep engine deps (`requests`, `signalrcore`); add `homeassistant` for IDE/CI if matching Carlinko
 
 ### A5. Tests that can pass on a stub
 
-- [ ] `tests/conftest.py` — load HA plugin on Unix; skip HA-runtime modules on Windows (`fcntl`)
-- [ ] `tests/test_changelog_release.py` — Traffical `manifest.json` path; no Carlinko changelog assertions
-- [ ] Translation tests only if `strings.json` / locales exist and are worth locking
+- [x] `tests/conftest.py` — load HA plugin on Unix; skip HA-runtime modules on Windows (`fcntl`)
+- [x] `tests/test_changelog_release.py` — Traffical `manifest.json` path; no Carlinko changelog assertions
+- [x] Translation tests only if `strings.json` / locales exist and are worth locking
 
 ### A6. Phase A done when
 
-- [ ] `pre-commit run --all-files` is clean (engine excluded or not yet formatted)
-- [ ] CI jobs exist and the stub passes hassfest, HACS, pytest
-- [ ] Existing `engine/` still runs as today (`python engine/entrypoint.py`)
+- [x] `pre-commit run --all-files` is clean (engine excluded or not yet formatted)
+- [x] CI jobs exist and the stub passes hassfest, HACS, pytest
+- [x] Existing `engine/` still runs as today (`python engine/entrypoint.py`)
 
 ---
 
@@ -91,15 +91,15 @@ Product target: [home-assistant-integration.md](./home-assistant-integration.md)
 
 ### B1. Relocate engine into the package
 
-| Today (`engine/`) | Target |
-|-------------------|--------|
-| Identity / OTP | `managers/` |
-| Mobile REST | `managers/` (API / mobile client) |
-| SignalR | `managers/` |
-| Session store | `managers/store.py` |
-| Ride / station / check-in shapes | `models/` |
-| Shared consts (HA-free) | `common/consts.py` |
-| CLI | `engine/entrypoint.py` + `engine/ha_free_path.py` only |
+| Today (`engine/`)                | Target                                                 |
+| -------------------------------- | ------------------------------------------------------ |
+| Identity / OTP                   | `managers/`                                            |
+| Mobile REST                      | `managers/` (API / mobile client)                      |
+| SignalR                          | `managers/`                                            |
+| Session store                    | `managers/store.py`                                    |
+| Ride / station / check-in shapes | `models/`                                              |
+| Shared consts (HA-free)          | `common/consts.py`                                     |
+| CLI                              | `engine/entrypoint.py` + `engine/ha_free_path.py` only |
 
 - [ ] Move clients/store/models out of `engine/` into `custom_components/traffical/`
 - [ ] Shrink `engine/` to entrypoint + synthetic `traffical` package mount (Carlinko `ha_free_path.py` pattern)
@@ -146,7 +146,7 @@ Product target: [home-assistant-integration.md](./home-assistant-integration.md)
 ## Out of scope (v1)
 
 - Driver GPS upload, route builder, join/QR, marketplace, incidents
-- Checking in *other* passengers
+- Checking in _other_ passengers
 - Copying Carlinko entity catalogs, opcodes, or vehicle blob decode
 - Reformatting the whole existing `engine/` in Phase A (exclude it from hooks instead)
 
@@ -154,6 +154,7 @@ Product target: [home-assistant-integration.md](./home-assistant-integration.md)
 
 ## Progress log
 
-| Date | Phase | Note |
-|------|-------|------|
-| 2026-09-02 | — | Research complete; this checklist created. No scaffolding applied yet. |
+| Date       | Phase | Note                                                                   |
+| ---------- | ----- | ---------------------------------------------------------------------- |
+| 2026-09-02 | —     | Research complete; this checklist created. No scaffolding applied yet. |
+| 2026-09-02 | A     | Stub integration, CI, standards, skills. Engine clients unchanged.     |

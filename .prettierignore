@@ -1,0 +1,8 @@
+*.jsonc
+debug/
+data/
+app/
+docs/product-overview.md
+docs/api-reference.md
+docs/passenger-experience.md
+docs/home-assistant-integration.md

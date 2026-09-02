@@ -1,0 +1,16 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Traffical",
+        "description": "Placeholder setup. Phone and OTP login will be added in a later release."
+      }
+    },
+    "error": {
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "Traffical is already configured."
+    }
+  }
+}

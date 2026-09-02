@@ -1,0 +1,38 @@
+rules:
+  config-flow: todo
+  entity-unique-id: todo
+  entity-unavailable: todo
+  diagnostics: todo
+  parallel-updates: todo
+  reauthentication-flow: todo
+  exception-translations: todo
+  reconfiguration-flow: todo
+  entity-translations: todo
+  icon-translations: todo
+  entity-category: todo
+  entity-event-setup: todo
+  stale-devices: todo
+  test-before-setup: todo
+  log-when-unavailable: todo
+  config-entry-unloading: todo
+  docs-installation-instructions: todo
+  docs-configuration-parameters: todo
+  docs-known-limitations: todo
+
+  action-setup: todo
+
+  appropriate-polling:
+    status: todo
+    comment: >-
+      Stub only. Target is cloud_polling HTTP (rides / check-in / details)
+      with automatic SignalR while a ride is Ongoing.
+
+  discovery:
+    status: exempt
+    comment: Account hub login only; no DHCP/Zeroconf discovery.
+
+  repair-issues:
+    status: exempt
+    comment: Auth failures will use reauthentication flow; no separate repair issues.
+
+  brands: todo
