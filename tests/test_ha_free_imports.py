@@ -14,6 +14,7 @@ _ENGINE = _REPO / "engine"
 _HA_FREE_MODULES = (
     "traffical.models.exceptions",
     "traffical.models.coordinates",
+    "traffical.models.ride_window",
     "traffical.models.rides",
     "traffical.models.stations",
     "traffical.managers.api_client",

@@ -4,6 +4,9 @@
 HA-free code lives in custom_components/traffical/{managers,models,common}/.
 Session is stored in data/config.json at the repo root.
 
+After login, prints loaded rides once and listens for HTTP polls
+and SignalR until Ctrl+C.
+
 Usage:
   python engine/entrypoint.py
   python -m engine.entrypoint
@@ -15,7 +18,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 import logging
 import os
 from pathlib import Path
@@ -33,6 +36,9 @@ from traffical.common.consts import (
     CONFIG_PATH,
     DEFAULT_ENVIRONMENT,
     ENVIRONMENTS,
+    FAST_WINDOW,
+    POLL_INTERVAL,
+    POLL_INTERVAL_FAST,
 )
 from traffical.common.helpers import client_session, create_pkce, partial_id
 from traffical.managers.identity_client import IdentityClient
@@ -41,6 +47,7 @@ from traffical.managers.signalr_client import SignalRHubs
 from traffical.managers.store import SessionStore
 from traffical.models.coordinates import MonitoredPath, coord_from_payload
 from traffical.models.exceptions import ApiError
+from traffical.models.ride_window import RideWindow
 from traffical.models.rides import (
     Ride,
     rides_customer_type,
@@ -110,8 +117,7 @@ def format_point(point: Any) -> str:
 async def prompt(message: str) -> str:
     """Read a line without blocking the event loop.
 
-    ``input`` runs off-thread so background tasks (SignalR listener,
-    auto-track poller) keep running while the menu waits for a keypress.
+    ``input`` runs off-thread so OTP prompts do not block SignalR or token refresh.
     """
     try:
         line = await asyncio.to_thread(input, message)
@@ -132,10 +138,11 @@ class App:
         self.identity = identity
         self.mobile = mobile
         self.hubs = hubs
-        self.day_date: str | None = None
-        self.day_rides: list[dict[str, Any]] = []
+        self.window = RideWindow()
+        self._force_dates: set[str] = set()
         self._lock = asyncio.Lock()
         self._route_refresh_task: asyncio.Task[None] | None = None
+        self._poll_task: asyncio.Task[None] | None = None
         self.mobile.on_unauthorized = self._try_refresh
         self.identity.on_unauthorized = self._try_refresh
 
@@ -162,17 +169,17 @@ class App:
         self.hubs.api_url = self.store.api_url.rstrip("/")
 
         if await self._resume_logged_in():
-            return await self._passenger_menu()
+            return await self._passenger_listen()
 
         if self.store.phone:
             _LOGGER.info("Saved phone; skipping to OTP")
             await self._otp_step(request_if_missing=True)
-            return await self._passenger_menu()
+            return await self._passenger_listen()
 
         await self._collect_phone()
         await self._request_otp()
         await self._otp_step(request_if_missing=False)
-        return await self._passenger_menu()
+        return await self._passenger_listen()
 
     def _log_logged_in(self) -> None:
         user = self.store.user
@@ -383,84 +390,134 @@ class App:
         except (TypeError, ValueError):
             return None
 
-    def _view_suffix(self, status: str) -> str:
-        if status_live(status):
-            return "live"
-        if status_finished(status):
-            return "finished, no live GPS"
-        return "GPS starts when ongoing"
-
-    async def _load_day(self, date_str: str) -> None:
-        customer_type = self._customer_type_path()
+    async def _list_day(self, customer_type: str, day: date, listed: set[str]) -> None:
+        service_date = day.isoformat()
+        if service_date in listed:
+            return
         try:
-            rides = await self.mobile.list_rides(customer_type, date_str)
+            rows = await self.mobile.list_rides(customer_type, service_date)
         except (ApiError, Exception) as exc:
             _LOGGER.error(f"List rides failed: {exc}")
-            async with self._lock:
-                self.day_date = date_str
-                self.day_rides = []
-            return
-        if not isinstance(rides, list):
-            rides = []
-        ride_ids: list[int] = []
-        for ride in rides:
-            ride_id = Ride(ride).ride_id
-            if ride_id is not None:
-                ride_ids.append(ride_id)
-        statuses: dict[int, dict] = {}
-        if ride_ids:
-            try:
-                raw = await self.mobile.checkin_statuses(ride_ids)
-                if isinstance(raw, list):
-                    for item in raw:
-                        rid = item.get("rideId")
-                        if rid is not None:
-                            try:
-                                statuses[int(rid)] = item
-                            except (TypeError, ValueError):
-                                pass
-            except (ApiError, Exception) as exc:
-                _LOGGER.error(f"Check-in statuses failed: {exc}")
-        _LOGGER.info(f"{len(rides)} ride(s) for {date_str} ({customer_type})")
-        built: list[dict[str, Any]] = []
-        for i, row in enumerate(rides, start=1):
-            ticket = Ride(row).ticket
+            rows = []
+        if not isinstance(rows, list):
+            rows = []
+        statuses = await self._checkin_map(rows)
+        entries: list[tuple[Any, dict[str, Any], Any]] = []
+        for row in rows:
+            ride = Ride(row)
             details: dict[str, Any] = {}
-            if ticket:
+            if ride.ticket:
                 try:
-                    loaded = await self.mobile.ride_details(ticket)
+                    loaded = await self.mobile.ride_details(ride.ticket)
                     if isinstance(loaded, dict):
                         details = loaded
                 except (ApiError, Exception) as exc:
-                    _LOGGER.error(f"Ride details failed for ride {i}: {exc}")
-            ride = Ride(row, details)
-            ride_id = ride.ride_id
-            check = statuses.get(ride_id) if ride_id is not None else None
-            built.append(
-                {
-                    "index": i,
-                    "list_row": row,
-                    "details": details,
-                    "ticket": ticket,
-                    "ride_id": ride_id,
-                    "status": ride.status,
-                    "checkin": check,
-                }
+                    _LOGGER.error(f"Ride details failed: {exc}")
+            check = statuses.get(ride.ride_id) if ride.ride_id is not None else None
+            entries.append((row, details, check))
+        self.window.set_day(service_date, entries)
+        listed.add(service_date)
+
+    async def _checkin_map(self, rows: list[Any]) -> dict[int, dict[str, Any]]:
+        statuses: dict[int, dict[str, Any]] = {}
+        ride_ids = [
+            ride_id
+            for ride_id in (Ride(row).ride_id for row in rows)
+            if ride_id is not None
+        ]
+        if not ride_ids:
+            return statuses
+        try:
+            raw = await self.mobile.checkin_statuses(ride_ids)
+        except (ApiError, Exception) as exc:
+            _LOGGER.error(f"Check-in statuses failed: {exc}")
+            return statuses
+        if not isinstance(raw, list):
+            return statuses
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            try:
+                statuses[int(item.get("rideId"))] = item
+            except (TypeError, ValueError):
+                pass
+        return statuses
+
+    async def _load_window(self) -> None:
+        customer_type = self._customer_type_path()
+        force = set(self._force_dates)
+        self._force_dates.clear()
+        today = date.today()
+        self.window.start_day(today)
+        listed: set[str] = set()
+        if self.window.needs_today(force):
+            await self._list_day(customer_type, today, listed)
+        while self.window.focus is None:
+            day = self.window.next_missing_date()
+            if day is None:
+                break
+            await self._list_day(customer_type, day, listed)
+        for day in self.window.forced_days(force):
+            await self._list_day(customer_type, day, listed)
+        self.window.bind()
+        _LOGGER.info(
+            f"{len(self.window.occurrences)} occurrence(s) "
+            f"loaded_dates={sorted(self.window.loaded_dates)} ({customer_type})"
+        )
+
+    def _window_fingerprint(self) -> tuple[Any, ...]:
+        occ = tuple(
+            (
+                item.get("ride_id"),
+                item.get("service_date"),
+                item.get("status"),
+                (
+                    (item.get("checkin") or {}).get("checkIn")
+                    if isinstance(item.get("checkin"), dict)
+                    else None
+                ),
             )
-        async with self._lock:
-            self.day_date = date_str
-            self.day_rides = built
+            for item in self.window.occurrences
+        )
+        focus = self.window.focus
+        return (occ, focus.get("ride_id") if focus else None, self.hubs.track_ride_id)
 
-    def _print_day_dump(self) -> None:
-        print(f"Date {self.day_date} · {len(self.day_rides)} ride(s)")
-        if not self.day_rides:
-            print("No rides for that date.")
+    def _poll_delay(self) -> float:
+        now = datetime.now(timezone.utc)
+        focus = self.window.focus
+        if focus:
+            start = Ride.from_cache(focus).start
+            if start and timedelta(0) <= (start - now) <= FAST_WINDOW:
+                return POLL_INTERVAL_FAST.total_seconds()
+        return POLL_INTERVAL.total_seconds()
+
+    def _print_window_dump(self) -> None:
+        occurrences = self.window.occurrences
+        print(
+            f"Rides {self.window.today_iso} · {len(occurrences)} occurrence(s) "
+            f"loaded={','.join(sorted(self.window.loaded_dates)) or 'none'}"
+        )
+        if not occurrences:
+            print("No rides in the window.")
             return
+        focus = self.window.focus
+        focus_id = focus.get("ride_id") if focus else None
+        by_date: dict[str, list[dict[str, Any]]] = {}
+        for item in occurrences:
+            by_date.setdefault(str(item.get("service_date") or ""), []).append(item)
         member_id = self._member_id()
-        for item in self.day_rides:
-            self._print_day_ride(item, member_id)
+        for date_str in sorted(by_date):
+            print()
+            print(f"Date {date_str} · {len(by_date[date_str])} ride(s)")
+            for index, item in enumerate(by_date[date_str], start=1):
+                shown = dict(item)
+                shown["index"] = index
+                mark = "  ← next" if shown.get("ride_id") == focus_id else ""
+                self._print_day_ride(shown, member_id, mark)
 
-    def _print_day_ride(self, item: dict[str, Any], member_id: int | None) -> None:
+    def _print_day_ride(
+        self, item: dict[str, Any], member_id: int | None, mark: str = ""
+    ) -> None:
         ride = Ride.from_cache(item)
         row = item.get("list_row") or {}
         info = row.get("rideInfo") if isinstance(row.get("rideInfo"), dict) else {}
@@ -470,7 +527,7 @@ class App:
         print()
         start = self._clock(details.get("startTime") or info.get("startDateTime"))
         end = self._clock(details.get("endTime") or info.get("endDateTime"))
-        print(f"── Ride {item.get('index')}  {ride.name}")
+        print(f"── Ride {item.get('index')}  {ride.name}{mark}")
         print(f"    {start}–{end}  {item.get('status') or ''}  check-in: {check_s}")
         driver = self._driver_name(details, info) or "—"
         shuttle = details.get("shuttleCompanyName") or info.get("shuttleCompany") or "—"
@@ -490,53 +547,14 @@ class App:
             extra = ("  " + " ".join(marks)) if marks else ""
             print(f"      {station.label}{extra}")
 
-    def _build_menu(self) -> list[dict[str, Any]]:
-        items: list[dict[str, Any]] = []
-        if self.hubs.track_ride_id is not None:
-            items.append({"label": "Stop live GPS", "action": "stop"})
-        for ride in self.day_rides:
-            idx = ride.get("index")
-            suffix = self._view_suffix(str(ride.get("status") or ""))
-            items.append(
-                {
-                    "label": f"Ride {idx} — view path ({suffix})",
-                    "action": "view",
-                    "ride": ride,
-                }
-            )
-        items.append({"label": "Change date", "action": "date"})
-        items.append({"label": "Quit", "action": "quit"})
-        return items
-
-    def _print_menu(self, items: list[dict[str, Any]]) -> None:
-        print()
-        print("Menu")
-        for i, item in enumerate(items, start=1):
-            print(f"  {i}. {item['label']}")
-        print()
-
-    async def _change_date(self) -> None:
-        raw = await prompt("Date [YYYY-MM-DD]: ")
-        if not raw:
-            print("Date unchanged.")
-            return
-        try:
-            date.fromisoformat(raw)
-        except ValueError:
-            print("Use YYYY-MM-DD.")
-            return
-        await self.hubs.stop_track()
-        await self._load_day(raw)
-        self._print_day_dump()
-
     def _print_path_snapshot(self, path: Any) -> None:
         points = MonitoredPath(path).points
         if not points:
-            print("No monitoring path yet (ride may not be live).")
+            _LOGGER.debug("No monitoring path yet (ride may not be live).")
             return
-        print(f"Monitoring path points: {len(points)}")
+        _LOGGER.debug(f"Monitoring path points: {len(points)}")
         for point in points[-5:]:
-            print(f"  {format_point(point)}")
+            _LOGGER.debug(f"  {format_point(point)}")
 
     async def _hub_event(self, event: str, payload: Any) -> None:
         if event == "ReceiveCoordinates":
@@ -574,46 +592,31 @@ class App:
         if not isinstance(status, str) or not status:
             return
         async with self._lock:
-            cached = self._match_day_ride("", ride_id)
-            if cached is None:
+            applied = self.window.apply_status(ride_id, status)
+            if applied is None:
                 _LOGGER.debug(
                     f"status push ignored ride={partial_id(ride_id)} reason=not_cached"
                 )
                 return
-            old_status = str(cached.get("status") or "")
-            if old_status == status:
-                return
-            cached["status"] = status
-            row = cached.get("list_row")
-            if isinstance(row, dict):
-                row["status"] = status
-            details = cached.get("details")
-            if isinstance(details, dict):
-                details["status"] = status
-            _LOGGER.info(
-                f"ride status changed ride={partial_id(ride_id)} "
-                f"old={old_status} new={status}"
-            )
-            if status_live(status) and not status_live(old_status):
-                await self._cmd_track_locked(cached)
-            elif status_finished(status) and self.hubs.track_ride_id == ride_id:
-                await self.hubs.stop_track()
-                _LOGGER.info(f"live tracking stopped ride={partial_id(ride_id)}")
+            _, old_status = applied
+            changed = old_status != status
+            if changed:
+                _LOGGER.info(
+                    f"ride status changed ride={partial_id(ride_id)} "
+                    f"old={old_status} new={status}"
+                )
+            await self._sync_live_track_locked()
+        if not changed:
+            return
+        self._print_window_dump()
+        if status_finished(status) and self.window.focus is None:
+            await self._load_window()
+            await self._sync_live_track()
+            self._print_window_dump()
 
     def _schedule_route_refresh(self, payload: Any) -> None:
-        if not isinstance(payload, dict) or not self._route_change_includes_day(
-            payload
-        ):
+        if not isinstance(payload, dict):
             return
-        if self._route_refresh_task is not None:
-            self._route_refresh_task.cancel()
-        self._route_refresh_task = asyncio.create_task(
-            self._debounced_route_refresh(), name="RouteRefresh"
-        )
-
-    def _route_change_includes_day(self, payload: dict[str, Any]) -> bool:
-        if not self.day_date:
-            return False
         try:
             start = datetime.fromisoformat(
                 str(payload.get("ChangeDateFrom")).replace("Z", "+00:00")
@@ -621,17 +624,27 @@ class App:
             end = datetime.fromisoformat(
                 str(payload.get("ChangeDateTo")).replace("Z", "+00:00")
             ).date()
-            selected = date.fromisoformat(self.day_date)
         except (TypeError, ValueError):
-            return False
-        return start <= selected <= end
+            return
+        forced = self.window.overlapping_dates(start, end)
+        if not forced:
+            return
+        self._force_dates.update(forced)
+        if self._route_refresh_task is not None:
+            self._route_refresh_task.cancel()
+        self._route_refresh_task = asyncio.create_task(
+            self._debounced_route_refresh(), name="RouteRefresh"
+        )
 
     async def _debounced_route_refresh(self) -> None:
         try:
             await asyncio.sleep(5)
-            if self.day_date:
-                await self._load_day(self.day_date)
-                _LOGGER.info("ride list refreshed source=RouteSuccessfulSave")
+            before = self._window_fingerprint()
+            await self._load_window()
+            await self._sync_live_track()
+            _LOGGER.info("ride list refreshed source=RouteSuccessfulSave")
+            if self._window_fingerprint() != before:
+                self._print_window_dump()
         except asyncio.CancelledError:
             raise
         finally:
@@ -650,16 +663,33 @@ class App:
         except (TypeError, ValueError):
             return None
 
-    async def _cmd_track(self, ride: dict[str, Any]) -> None:
+    async def _sync_live_track(self) -> None:
         async with self._lock:
-            await self._cmd_track_locked(ride)
+            await self._sync_live_track_locked()
+
+    async def _sync_live_track_locked(self) -> None:
+        live_key = self.window.map_focus_key
+        if live_key is None:
+            if self.hubs.track_ride_id is not None:
+                await self.hubs.stop_track()
+            return
+        ride = self.window.rides.get(live_key) or {}
+        if not status_live(str(ride.get("status") or "")):
+            if self.hubs.track_ride_id is not None:
+                await self.hubs.stop_track()
+            return
+        await self._cmd_track_locked(ride)
 
     async def _cmd_track_locked(self, ride: dict[str, Any]) -> None:
         resolved = self._resolved_from_day(ride)
         if resolved is None:
             return
         ride_id, details = resolved
+        if self.hubs.track_ride_id == ride_id:
+            return
         status = str(ride.get("status") or details.get("status") or "")
+        if not status_live(status):
+            return
         try:
             path = await self.mobile.monitoring_path(ride_id)
         except (ApiError, Exception) as exc:
@@ -668,100 +698,55 @@ class App:
             )
             path = []
         self._print_path_snapshot(path)
-        if status_live(status):
-            hub_ok = True
-            try:
-                await self.hubs.start_track(ride_id, self._hub_event)
-            except Exception as exc:
-                hub_ok = False
-                _LOGGER.error(f"Dashboard hub failed: {exc}")
-            snapshot = MonitoredPath(path)
-            _LOGGER.info(
-                f"live tracking started ride={partial_id(str(ride_id))} "
-                f"source=signalr hub={'on' if hub_ok else 'failed'} "
-                f"seeded={len(snapshot.points)} point(s)"
-            )
-            _LOGGER.debug(f"path groups {snapshot.sources}")
-            print(
-                "Tracking live via SignalR. "
-                "Positions log at DEBUG. Stop will appear in the next menu."
-            )
-            return
-        if status_finished(status):
-            print(
-                f"Ride status is {status}; live GPS has ended. Showing path snapshot only."
-            )
-            return
-        print(
-            f"Ride status is {status or 'unknown'}; live GPS starts when the ride is ongoing."
+        hub_ok = True
+        try:
+            await self.hubs.start_track(ride_id, self._hub_event)
+        except Exception as exc:
+            hub_ok = False
+            _LOGGER.error(f"Dashboard hub failed: {exc}")
+        snapshot = MonitoredPath(path)
+        _LOGGER.info(
+            f"live tracking started ride={partial_id(str(ride_id))} "
+            f"source=signalr hub={'on' if hub_ok else 'failed'} "
+            f"seeded={len(snapshot.points)} point(s)"
         )
-
-    async def _cmd_stop(self) -> None:
-        await self.hubs.stop_track()
-        print("Stopped live GPS.")
-
-    def _match_day_ride(
-        self, ticket: str, ride_id: int | None
-    ) -> dict[str, Any] | None:
-        for ride in self.day_rides:
-            if ticket and ride.get("ticket") and ticket == ride.get("ticket"):
-                return ride
-            cached_id = ride.get("ride_id")
-            if (
-                ride_id is not None
-                and cached_id is not None
-                and int(cached_id) == ride_id
-            ):
-                return ride
-        return None
+        _LOGGER.debug(f"path groups {snapshot.sources}")
 
     async def _shutdown_passenger(self) -> None:
+        if self._poll_task is not None:
+            self._poll_task.cancel()
+            self._poll_task = None
         if self._route_refresh_task is not None:
             self._route_refresh_task.cancel()
             self._route_refresh_task = None
         await self.hubs.stop_mobile()
         await self.hubs.stop_track()
 
-    async def _passenger_menu(self) -> int:
+    async def _poll_loop(self) -> None:
+        while True:
+            await asyncio.sleep(self._poll_delay())
+            before = self._window_fingerprint()
+            await self._load_window()
+            await self._sync_live_track()
+            if self._window_fingerprint() != before:
+                self._print_window_dump()
+
+    async def _passenger_listen(self) -> int:
         await self._load_passenger_context()
         self._session_banner()
-        await self._load_day(date.today().isoformat())
         await self.hubs.start_mobile(self._mobile_hub_event)
-        self._print_day_dump()
-        while True:
-            items = self._build_menu()
-            self._print_menu(items)
-            try:
-                line = await prompt("> ")
-            except SystemExit:
-                await self._shutdown_passenger()
-                return 0
-            if not line:
-                print("Enter a menu number.")
-                continue
-            try:
-                choice = int(line)
-            except ValueError:
-                print("Enter a menu number.")
-                continue
-            if choice < 1 or choice > len(items):
-                print("Enter a menu number.")
-                continue
-            picked = items[choice - 1]
-            action = picked["action"]
-            if action == "quit":
-                await self._shutdown_passenger()
-                return 0
-            if action == "stop":
-                await self._cmd_stop()
-                continue
-            if action == "view":
-                await self._cmd_track(picked["ride"])
-                continue
-            if action == "date":
-                await self._change_date()
-                continue
-            print("Enter a menu number.")
+        await self._load_window()
+        await self._sync_live_track()
+        self._print_window_dump()
+        print("Listening for ride updates (Ctrl+C to exit).")
+        self._poll_task = asyncio.create_task(self._poll_loop(), name="RidePoll")
+        try:
+            await asyncio.Future()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await self._shutdown_passenger()
+        return 0
 
 
 def parse_args() -> argparse.Namespace:

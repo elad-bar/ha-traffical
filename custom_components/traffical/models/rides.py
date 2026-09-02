@@ -145,6 +145,32 @@ class Ride:
                 return station
         return None
 
+    def occurrence(
+        self, service_date: str, checkin: Any = None
+    ) -> dict[str, Any] | None:
+        """Cache record for this ride on one service date."""
+        key = self.key
+        if key is None:
+            return None
+        return {
+            "key": key,
+            "service_date": service_date,
+            "route_id": self.route_id,
+            "direction": self.direction,
+            "ride_id": self.ride_id,
+            "ticket": self.ticket,
+            "name": self.name,
+            "status": self.status,
+            "list_row": self._row,
+            "details": self._details,
+            "checkin": checkin,
+            "assigned_today": False,
+            "lat": None,
+            "lng": None,
+            "passed_stations": set(),
+            "approaching_fired": False,
+        }
+
 
 def focus_ride_key(rides: dict[str, Any]) -> str | None:
     """Live ride, else earliest unfinished assigned ride today."""

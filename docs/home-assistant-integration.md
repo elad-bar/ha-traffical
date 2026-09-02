@@ -34,9 +34,11 @@ the next ride is within ~30 minutes of start.
 
 Each tick:
 
-1. `POST /api/Mobile/Rides/{customerType}` for today (Municipality on this tenant)
+1. `POST /api/Mobile/Rides/{customerType}` for **today** while any of today’s rides are unfinished. If today is finished (or empty), list the next calendar days **one at a time** until an unfinished ride is found, at most 4 days ahead. Cached future days are not listed again until they become today or a `RouteSuccessfulSave` overlaps them.
 2. `POST /api/Mobile/CheckIn/GetStatuses` for those `rideId`s
 3. Ride details when a ride is new or status changed
+
+Each recurring line device is bound to **today’s** occurrence only. If today’s trip is finished, that device stays `Finished*` (same `rideId`) until the next calendar day — tomorrow’s instance is not written onto the device. The hub **Next ride** sensor uses the cached occurrence window (live, else the next unfinished ride found within four days).
 
 Respect mobile API rate limits (`X-Rate-Limit-Limit: 1s`). Do not poll every second.
 
@@ -48,11 +50,11 @@ Keep a user-scoped `mobileHub` connection open for the config-entry session.
 It requires no subscription invoke:
 
 - `UpdateRideStatus` is a JSON string containing PascalCase `Id` and `Status`.
-  Patch only a ride already present in today's cache, then attach or detach live
-  GPS immediately.
+  Patch a ride already present in the occurrence cache, then attach or detach live
+  GPS immediately when the **bound** (today) ride is live.
 - `RouteSuccessfulSave` is a JSON string containing `ChangeDateFrom`,
-  `ChangeDateTo`, and `RouteId`. If its range includes today, debounce for about
-  five seconds and refresh the affected day's rides over HTTP.
+  `ChangeDateTo`, and `RouteId`. If its range overlaps today through +4 days, debounce for about
+  five seconds and refresh only the overlapping dates over HTTP.
 
 Reconnect `mobileHub` after a drop, token refresh, or child switch. It replaces
 the fast ride-list status poll; initial rides, check-in, details, and route-save
@@ -100,7 +102,7 @@ A Traffical **`rideId` is a one-day instance**. Do **not** create a new HA devic
 | Morning inbound | `routeId` 392681, `direction` 120 | `rideId` 39306112 |
 | Afternoon outbound | `routeId` 428988, `direction` 121 | `rideId` 38592351 |
 
-Entity ids stay stable (`device_tracker.traffical_afternoon_bus`). The coordinator writes today’s `rideId`, ticket, times, and stations onto that device.
+Entity ids stay stable (`device_tracker.traffical_afternoon_bus`). The coordinator writes **today’s** `rideId`, ticket, times, and stations onto that device. A finished today occurrence is not replaced by the next day’s `New` instance until the calendar date rolls.
 
 Entities on each ride device:
 
@@ -146,7 +148,7 @@ Unavailable buttons stay on the device and are greyed out (`available = False`).
 
 | Entity | Role |
 |--------|------|
-| `sensor.traffical_next_ride` | Next (or current) ride: direction, start, my station, destination, `ride_id`, ticket |
+| `sensor.traffical_next_ride` | Next (or current) ride: direction, start, my station, destination, `ride_id`, ticket, `service_date` (may be after today, up to 4 days) |
 | `sensor.traffical_{ride}_status` | `New`, `Ongoing`, `OngoingMonitored`, `Finished`, `FinishedMonitored`, … |
 | `binary_sensor.traffical_{ride}_checked_in` | From `CheckIn/GetStatuses` (`checkIn`, `checkInAt`); unknown if `checkIn` is null |
 | `sensor.traffical_{ride}_my_station` | Assigned stop **address** (geocoded `address`; keep raw `name` as a secondary attribute), scheduled arrival, lat/lng |
@@ -172,7 +174,7 @@ Optional: delay vs schedule, progress along stations, “approaching my stop”.
 
 Stations are not extra `device_tracker`s (they do not move) and not a **normal** HA zone per stop (that would steal “in zone” from people and from the bus).
 
-One `geo_location` per station on that ride device (today’s path). They show on the default Map **only for the focus ride**: a live `Ongoing*` ride if any, otherwise the next unfinished assigned ride today (earliest start). Finished / earlier same-day rides keep their markers in the registry but unavailable. After the last ride finishes, no station pins. Friendly name is the station **address** (it matches `lat`/`lng`); keep `name` as an extra attribute because it is often a stale dispatcher label. For `isTarget` stations, prefer **name** (school / activity) and keep `address` as an attribute. Icon and color depend on **role** and **progress**:
+One `geo_location` per station on that ride device (today’s path). They show on the default Map **only for the bound focus ride**: a live `Ongoing*` ride if any, otherwise the next unfinished **assigned today** ride (earliest start). Finished / earlier same-day rides keep their markers in the registry but unavailable. After the last **today** ride finishes, no station pins (tomorrow’s trip is not drawn on a device whose status is still Finished). Friendly name is the station **address** (it matches `lat`/`lng`); keep `name` as an extra attribute because it is often a stale dispatcher label. For `isTarget` stations, prefer **name** (school / activity) and keep `address` as an attribute. Icon and color depend on **role** and **progress**:
 
 | Kind | Detection | Icon (example) | Color |
 |------|-----------|----------------|-------|

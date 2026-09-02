@@ -70,6 +70,7 @@ class TrafficalSensor(TrafficalEntity, SensorEntity):
                 "ticket": ride.get("ticket"),
                 "direction": ride.get("direction"),
                 "status": ride.get("status"),
+                "service_date": ride.get("service_date"),
             }
         ride = self.coordinator.ride(self.ride_key)
         details = ride.get("details") or {}
@@ -89,11 +90,8 @@ class TrafficalSensor(TrafficalEntity, SensorEntity):
         return {}
 
     def _next_ride_obj(self) -> dict[str, Any] | None:
-        key = (self.coordinator.data or {}).get("focus_ride_key")
-        if not key:
-            return None
-        ride = self.coordinator.ride(str(key))
-        return ride or None
+        focus = (self.coordinator.data or {}).get("focus")
+        return focus if isinstance(focus, dict) else None
 
     def _next_ride(self) -> str | None:
         ride = self._next_ride_obj()

@@ -132,6 +132,13 @@ def _account_details(coordinator: TrafficalCoordinator) -> dict[str, Any]:
         "update_interval": interval.total_seconds() if interval else None,
         "live_key": data.get("live_key"),
         "focus_ride_key": data.get("focus_ride_key"),
+        "occurrence_count": len(data.get("occurrences") or []),
+        "loaded_dates": list(data.get("loaded_dates") or []),
+        "focus_service_date": (
+            (data.get("focus") or {}).get("service_date")
+            if isinstance(data.get("focus"), dict)
+            else None
+        ),
     }
 
 
@@ -152,6 +159,7 @@ def _ride_summary(
         "direction": ride.get("direction"),
         "ride_id": ride.get("ride_id"),
         "status": ride.get("status"),
+        "service_date": ride.get("service_date"),
         "assigned_today": bool(ride.get("assigned_today")),
         "ticket_present": bool(ride.get("ticket") or model.ticket),
         "check_in": check.get("checkIn") if check else None,

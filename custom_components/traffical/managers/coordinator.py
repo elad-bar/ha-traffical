@@ -32,9 +32,9 @@ from ..common.consts import (
 from ..common.helpers import client_session, parse_utc, partial_id
 from ..models.coordinates import MonitoredPath, coord_from_payload
 from ..models.exceptions import ApiError, AuthError
+from ..models.ride_window import RideWindow
 from ..models.rides import (
     Ride,
-    focus_ride_key,
     rides_customer_type,
     status_finished,
     status_live,
@@ -89,6 +89,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._reauth_started = False
         self._ride_listener: Callable[[], None] | None = None
         self._route_refresh_task: asyncio.Task[None] | None = None
+        self.window = RideWindow()
         self.data: dict[str, Any] = {
             "rides": {},
             "user": {},
@@ -97,7 +98,11 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "session_ok": False,
             "live_key": None,
             "focus_ride_key": None,
+            "focus": None,
+            "occurrences": [],
+            "loaded_dates": [],
         }
+        self._force_dates: set[str] = set()
         self.identity.on_unauthorized = self._on_unauthorized
         self.mobile.on_unauthorized = self._on_unauthorized
 
@@ -234,89 +239,114 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         children = self._children_from_roles(roles)
         customer = (self.store.user or {}).get("customer") or {}
         customer_type = rides_customer_type(customer.get("type"))
-        date_str = date.today().isoformat()
-        rides_raw = await self.mobile.list_rides(customer_type, date_str)
-        if not isinstance(rides_raw, list):
-            rides_raw = []
-        ride_ids: list[int] = []
-        for row in rides_raw:
-            ride_id = Ride(row).ride_id
-            if ride_id is not None:
-                ride_ids.append(ride_id)
-        statuses: dict[int, dict[str, Any]] = {}
-        if ride_ids:
-            raw_status = await self.mobile.checkin_statuses(ride_ids)
-            if isinstance(raw_status, list):
-                for item in raw_status:
-                    if not isinstance(item, dict):
-                        continue
-                    try:
-                        statuses[int(item.get("rideId"))] = item
-                    except (TypeError, ValueError):
-                        pass
-        previous = (self.data.get("rides") if self.data else None) or {}
-        rides: dict[str, dict[str, Any]] = {k: dict(v) for k, v in previous.items()}
-        for key, ride in rides.items():
-            ride["assigned_today"] = False
-        live_key: str | None = None
-        for row in rides_raw:
-            ticket = Ride(row).ticket
-            details: dict[str, Any] = {}
-            if ticket:
-                loaded = await self.mobile.ride_details(ticket)
-                if isinstance(loaded, dict):
-                    details = loaded
-            ride = Ride(row, details)
-            key = ride.key
-            if key is None:
-                continue
-            ride_id = ride.ride_id
-            old = previous.get(key) or {}
-            status = ride.status
-            old_status = str(old.get("status") or "")
-            check = statuses.get(ride_id) if ride_id is not None else None
-            passed = set(old.get("passed_stations") or [])
-            lat = old.get("lat")
-            lng = old.get("lng")
-            rides[key] = {
-                "key": key,
-                "route_id": ride.route_id,
-                "direction": ride.direction,
-                "ride_id": ride_id,
-                "ticket": ticket,
-                "name": ride.name,
-                "status": status,
-                "list_row": row,
-                "details": details,
-                "checkin": check,
-                "assigned_today": True,
-                "lat": lat,
-                "lng": lng,
-                "passed_stations": passed,
-                "approaching_fired": bool(old.get("approaching_fired")),
-            }
-            self._emit_status(key, old_status, status, ride_id, details, row)
-            self._emit_checkin(key, old.get("checkin"), check, ride_id)
-            if status_live(status):
-                live_key = key
+        force = set(self._force_dates)
+        self._force_dates.clear()
+        previous = {key: dict(ride) for key, ride in (self.window.rides or {}).items()}
+        await self._fill_window(customer_type, date.today(), force)
+        rides = self.window.bind()
+        self._emit_ride_changes(previous, rides)
+        focus = self.window.focus
         _LOGGER.info(
             f"ride list refreshed count={sum(1 for r in rides.values() if r.get('assigned_today'))}"
         )
-        self._adjust_interval(rides)
+        self._adjust_interval(focus)
+        live_key = self.window.live_key
         data = {
             "rides": rides,
+            "occurrences": self.window.occurrences,
+            "loaded_dates": sorted(self.window.loaded_dates),
             "user": self.store.user,
             "policies": policies,
             "children": children,
             "session_ok": True,
             "live_key": live_key,
-            "focus_ride_key": focus_ride_key(rides),
+            "focus": focus,
+            "focus_ride_key": self.window.map_focus_key,
         }
         self.data = data
         self._register_devices()
         await self._sync_signalr(live_key, rides)
         self._notify_entities()
         return data
+
+    async def _fill_window(
+        self, customer_type: str, today: date, force_dates: set[str]
+    ) -> None:
+        """List today, then lookahead days only until a next ride shows up."""
+        self.window.start_day(today)
+        listed: set[str] = set()
+        if self.window.needs_today(force_dates):
+            await self._list_day(customer_type, today, listed)
+        while self.window.focus is None:
+            day = self.window.next_missing_date()
+            if day is None:
+                break
+            await self._list_day(customer_type, day, listed)
+        for day in self.window.forced_days(force_dates):
+            await self._list_day(customer_type, day, listed)
+
+    async def _list_day(self, customer_type: str, day: date, listed: set[str]) -> None:
+        service_date = day.isoformat()
+        if service_date in listed:
+            return
+        rows = await self.mobile.list_rides(customer_type, service_date)
+        if not isinstance(rows, list):
+            rows = []
+        ride_ids = [
+            ride_id
+            for ride_id in (Ride(row).ride_id for row in rows)
+            if ride_id is not None
+        ]
+        statuses = await self._checkin_map(ride_ids)
+        entries: list[tuple[Any, dict[str, Any], Any]] = []
+        for row in rows:
+            ride = Ride(row)
+            details: dict[str, Any] = {}
+            if ride.ticket:
+                loaded = await self.mobile.ride_details(ride.ticket)
+                if isinstance(loaded, dict):
+                    details = loaded
+            check = statuses.get(ride.ride_id) if ride.ride_id is not None else None
+            entries.append((row, details, check))
+        self.window.set_day(service_date, entries)
+        listed.add(service_date)
+
+    async def _checkin_map(self, ride_ids: list[int]) -> dict[int, dict[str, Any]]:
+        statuses: dict[int, dict[str, Any]] = {}
+        if not ride_ids:
+            return statuses
+        raw_status = await self.mobile.checkin_statuses(ride_ids)
+        if not isinstance(raw_status, list):
+            return statuses
+        for item in raw_status:
+            if not isinstance(item, dict):
+                continue
+            try:
+                statuses[int(item.get("rideId"))] = item
+            except (TypeError, ValueError):
+                pass
+        return statuses
+
+    def _emit_ride_changes(
+        self,
+        previous: dict[str, dict[str, Any]],
+        rides: dict[str, dict[str, Any]],
+    ) -> None:
+        for key, ride in rides.items():
+            if not ride.get("assigned_today"):
+                continue
+            old = previous.get(key) or {}
+            self._emit_status(
+                key,
+                str(old.get("status") or ""),
+                str(ride.get("status") or ""),
+                ride.get("ride_id"),
+                ride.get("details") or {},
+                ride.get("list_row") or {},
+            )
+            self._emit_checkin(
+                key, old.get("checkin"), ride.get("checkin"), ride.get("ride_id")
+            )
 
     def _children_from_roles(self, roles: Any) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
@@ -381,13 +411,11 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             },
         )
 
-    def _adjust_interval(self, rides: dict[str, dict[str, Any]]) -> None:
+    def _adjust_interval(self, focus: dict[str, Any] | None) -> None:
         now = datetime.now(timezone.utc)
         fast = False
-        for ride in rides.values():
-            if not ride.get("assigned_today"):
-                continue
-            start = Ride.from_cache(ride).start
+        if focus:
+            start = Ride.from_cache(focus).start
             if start and timedelta(0) <= (start - now) <= FAST_WINDOW:
                 fast = True
         wanted = POLL_INTERVAL_FAST if fast else POLL_INTERVAL
@@ -443,58 +471,50 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         if not isinstance(status_raw, str) or not status_raw:
             return
-        rides = self.data.get("rides") or {}
-        match: tuple[str, dict[str, Any]] | None = None
-        for key, ride in rides.items():
-            if ride.get("assigned_today") and ride.get("ride_id") == ride_id:
-                match = key, ride
-                break
-        if match is None:
+        applied = self.window.apply_status(ride_id, status_raw)
+        if applied is None:
             _LOGGER.debug(
                 f"status push ignored ride={partial_id(ride_id)} reason=not_cached"
             )
             return
-        key, ride = match
-        old_status = str(ride.get("status") or "")
-        if old_status == status_raw:
-            return
-        ride["status"] = status_raw
-        row = ride.get("list_row") or {}
-        details = ride.get("details") or {}
-        row["status"] = status_raw
-        details["status"] = status_raw
-        self._emit_status(key, old_status, status_raw, ride_id, details, row)
-        live_key = next(
-            (
-                candidate_key
-                for candidate_key, candidate in rides.items()
-                if candidate.get("assigned_today")
-                and status_live(str(candidate.get("status") or ""))
-            ),
-            None,
-        )
+        bound_key, old_status = applied
+        rides = self.window.rides
+        if bound_key is not None and old_status != status_raw:
+            ride = rides.get(bound_key) or {}
+            self._emit_status(
+                bound_key,
+                old_status,
+                status_raw,
+                ride_id,
+                ride.get("details") or {},
+                ride.get("list_row") or {},
+            )
+        live_key = self.window.live_key
         self.data["live_key"] = live_key
-        self.data["focus_ride_key"] = focus_ride_key(rides)
+        self.data["focus"] = self.window.focus
+        self.data["focus_ride_key"] = self.window.map_focus_key
         await self._sync_signalr(live_key, rides)
         self.async_set_updated_data(self.data)
+        if status_finished(status_raw) and self.data.get("focus") is None:
+            await self.async_request_refresh()
 
     def _schedule_route_refresh(self, payload: Any) -> None:
-        if not isinstance(payload, dict) or not self._route_change_includes_today(
-            payload
-        ):
+        if not isinstance(payload, dict):
             return
+        start = parse_utc(payload.get("ChangeDateFrom"))
+        end = parse_utc(payload.get("ChangeDateTo"))
+        forced = self.window.overlapping_dates(
+            start.date() if start else None,
+            end.date() if end else None,
+        )
+        if not forced:
+            return
+        self._force_dates.update(forced)
         if self._route_refresh_task is not None:
             self._route_refresh_task.cancel()
         self._route_refresh_task = asyncio.create_task(
             self._debounced_route_refresh(), name="traffical-route-refresh"
         )
-
-    @staticmethod
-    def _route_change_includes_today(payload: dict[str, Any]) -> bool:
-        start = parse_utc(payload.get("ChangeDateFrom"))
-        end = parse_utc(payload.get("ChangeDateTo"))
-        today = date.today()
-        return bool(start and end and start.date() <= today <= end.date())
 
     async def _debounced_route_refresh(self) -> None:
         try:

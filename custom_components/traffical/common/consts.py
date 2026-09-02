@@ -68,6 +68,7 @@ CONF_POLL_INTERVAL = "poll_interval"
 POLL_INTERVAL = timedelta(minutes=3)
 POLL_INTERVAL_FAST = timedelta(seconds=45)
 FAST_WINDOW = timedelta(minutes=30)
+RIDES_LOOKAHEAD_DAYS = 4
 ATTR_LATITUDE = "latitude"
 ATTR_LONGITUDE = "longitude"
 
