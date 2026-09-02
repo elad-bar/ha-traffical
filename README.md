@@ -9,6 +9,7 @@ Not affiliated with Traffical / Shift.
 Product design: [docs/home-assistant-integration.md](docs/home-assistant-integration.md).
 API notes: [docs/api-reference.md](docs/api-reference.md).
 Passenger flow: [docs/passenger-experience.md](docs/passenger-experience.md).
+Suggested automations: [docs/suggested-automations.md](docs/suggested-automations.md).
 
 **Status:** Native Home Assistant integration (phone + OTP, rides, check-in, live GPS).
 The CLI `python engine/entrypoint.py` uses the same HA-free clients.
@@ -88,12 +89,7 @@ The same six signals are available as **ride device triggers** (Automations → 
 | `traffical_arrived_station`     | Bus marked a station passed                            |
 | `traffical_approaching_stop`    | Bus GPS within about 80 m of the home stop (once)      |
 
-```yaml
-triggers:
-  - trigger: event
-    event_type: traffical_approaching_stop
-```
-
+Example YAML: [docs/suggested-automations.md](docs/suggested-automations.md).
 Availability, check-in policy windows, and station icons: [docs/home-assistant-integration.md](docs/home-assistant-integration.md).
 
 ## Engine CLI
