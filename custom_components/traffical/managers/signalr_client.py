@@ -18,7 +18,7 @@ from ..common.consts import (
     MOBILE_HUB,
     SIGNALR_RECORD_SEP,
 )
-from ..common.helpers import authorization_header, ssl_context
+from ..common.helpers import authorization_header, now_iso, ssl_context
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,6 +96,56 @@ class SignalRHubs:
         self._mobile_on_event: OnEvent | None = None
         self._mobile_closed = asyncio.Event()
         self._mobile_frames: dict[str, int] = {}
+        self._dashboard_diag: dict[str, Any] = {}
+        self._mobile_diag: dict[str, Any] = {}
+
+    def _ws_open(self, ws: aiohttp.ClientWebSocketResponse | None) -> bool:
+        return ws is not None and not ws.closed
+
+    def _task_running(self, task: asyncio.Task[None] | None) -> bool:
+        return task is not None and not task.done()
+
+    def _hub_snapshot(
+        self,
+        diag: dict[str, Any],
+        *,
+        frames: dict[str, int],
+        ws: aiohttp.ClientWebSocketResponse | None,
+        task: asyncio.Task[None] | None,
+    ) -> dict[str, Any]:
+        invocations = sum(
+            count for kind, count in frames.items() if kind.startswith("invocation:")
+        )
+        return {
+            "ws_open": self._ws_open(ws),
+            "task_running": self._task_running(task),
+            "last_negotiate_status": diag.get("last_negotiate_status"),
+            "negotiate_hops": diag.get("negotiate_hops"),
+            "last_error": diag.get("last_error"),
+            "last_event": diag.get("last_event"),
+            "last_event_at": diag.get("last_event_at"),
+            "invocations": invocations,
+            "frames": dict(frames),
+        }
+
+    def snapshot_for_diagnostics(self) -> dict[str, Any]:
+        """Hub health for HA diagnostics (no GPS, no tokens)."""
+        dashboard = self._hub_snapshot(
+            self._dashboard_diag,
+            frames=self._frames,
+            ws=self._ws,
+            task=self._task,
+        )
+        dashboard["track_ride_id"] = self.track_ride_id
+        return {
+            "dashboard": dashboard,
+            "mobile": self._hub_snapshot(
+                self._mobile_diag,
+                frames=self._mobile_frames,
+                ws=self._mobile_ws,
+                task=self._mobile_task,
+            ),
+        }
 
     def _tally(self) -> str:
         return ", ".join(f"{k}={v}" for k, v in sorted(self._frames.items())) or "none"
@@ -205,7 +255,8 @@ class SignalRHubs:
                 await self._connect_and_listen(ride_id)
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception as exc:
+                self._dashboard_diag["last_error"] = _redact(str(exc))
                 _LOGGER.exception("Dashboard hub failed")
             finally:
                 self._ws = None
@@ -225,7 +276,8 @@ class SignalRHubs:
                 await self._connect_mobile()
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception as exc:
+                self._mobile_diag["last_error"] = _redact(str(exc))
                 _LOGGER.exception("Mobile hub failed")
             finally:
                 self._mobile_ws = None
@@ -239,7 +291,9 @@ class SignalRHubs:
             except asyncio.TimeoutError:
                 pass
 
-    async def _negotiate(self, hub_url: str, token: str) -> dict[str, Any]:
+    async def _negotiate(
+        self, hub_url: str, token: str, diag: dict[str, Any]
+    ) -> dict[str, Any]:
         headers = {}
         if token:
             headers["Authorization"] = authorization_header(
@@ -253,17 +307,23 @@ class SignalRHubs:
             headers=headers,
             timeout=timeout,
         ) as resp:
+            diag["last_negotiate_status"] = resp.status
             if resp.status >= 400:
                 text = await resp.text()
+                redacted = _redact(text)
+                diag["last_error"] = f"negotiate ({resp.status}): {redacted}"
                 raise RuntimeError(
-                    f"SignalR negotiate failed ({resp.status}): {_redact(text)}"
+                    f"SignalR negotiate failed ({resp.status}): {redacted}"
                 )
             data = await resp.json(content_type=None)
         if not isinstance(data, dict):
+            diag["last_error"] = "negotiate returned no object"
             raise RuntimeError("SignalR negotiate returned no object")
         return data
 
-    async def _negotiate_chain(self, hub_url: str) -> tuple[str, str, str]:
+    async def _negotiate_chain(
+        self, hub_url: str, diag: dict[str, Any]
+    ) -> tuple[str, str, str]:
         """Resolve the connect URL, connection token and access token.
 
         Azure SignalR replies to the first negotiate with a redirect carrying a
@@ -273,10 +333,12 @@ class SignalRHubs:
         """
         url = hub_url
         token = self._access_token()
+        hops = 0
         for _ in range(MAX_NEGOTIATE_REDIRECTS):
-            data = await self._negotiate(url, token)
+            data = await self._negotiate(url, token, diag)
             redirect = str(data.get("url") or "").strip()
             if redirect:
+                hops += 1
                 url = redirect
                 token = str(data.get("accessToken") or "").strip() or token
                 continue
@@ -284,13 +346,18 @@ class SignalRHubs:
                 data.get("connectionToken") or data.get("connectionId") or ""
             ).strip()
             if not connection_token:
+                diag["last_error"] = "negotiate returned no connection token"
                 raise RuntimeError("SignalR negotiate returned no connection token")
+            diag["negotiate_hops"] = hops
             return url, connection_token, token
+        diag["last_error"] = "negotiate redirected too many times"
         raise RuntimeError("SignalR negotiate redirected too many times")
 
     async def _connect_and_listen(self, ride_id: int) -> None:
         hub_url = _hub_http_url(self.api_url, DASHBOARD_HUB)
-        url, connection_token, token = await self._negotiate_chain(hub_url)
+        url, connection_token, token = await self._negotiate_chain(
+            hub_url, self._dashboard_diag
+        )
         query = {"id": connection_token}
         if token:
             query["access_token"] = token
@@ -354,7 +421,9 @@ class SignalRHubs:
 
     async def _connect_mobile(self) -> None:
         hub_url = _hub_http_url(self.api_url, MOBILE_HUB)
-        url, connection_token, token = await self._negotiate_chain(hub_url)
+        url, connection_token, token = await self._negotiate_chain(
+            hub_url, self._mobile_diag
+        )
         query = {"id": connection_token}
         if token:
             query["access_token"] = token
@@ -438,6 +507,8 @@ class SignalRHubs:
                 continue
             if self._mobile_frames.get(kind) == 1:
                 _LOGGER.info(f"SignalR first push hub={MOBILE_HUB} target={target}")
+            self._mobile_diag["last_event"] = str(target)
+            self._mobile_diag["last_event_at"] = now_iso()
             on_event = self._mobile_on_event
             if on_event is None:
                 continue
@@ -494,6 +565,8 @@ class SignalRHubs:
                 continue
             if self._frames.get(kind) == 1:
                 _LOGGER.info(f"SignalR first push target={target}")
+            self._dashboard_diag["last_event"] = str(target)
+            self._dashboard_diag["last_event_at"] = now_iso()
             args = _parse_hub_args(payload.get("arguments"))
             on_event = self._on_event
             if on_event is None:

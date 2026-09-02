@@ -101,6 +101,8 @@ Shared contract for integration and engine. Named HA lines, flows, and `caplog` 
 
 **Redaction.** Never log OTP codes, tokens, full request/response bodies, full phone numbers, child names, or GPS coordinates at INFO. Use `partial_id` / masking helpers when they exist.
 
+**Diagnostics vs logs.** In-memory HTTP snapshots for HA diagnostics (`ApiClient` query log) are not `_LOGGER`. Do not INFO-dump those records. OTP / authorize / token exchange stay out of that snapshot store.
+
 **Home Assistant:** do not attach handlers. HA sets the level for `custom_components.traffical`.
 
 **Engine:** may configure logging in `entrypoint.py` (stdout, `LOG_LEVEL` only, including repo-root `.env` via `python-dotenv`). Default INFO. Do not add a second variable for the same knob. Same client loggers, not a parallel `print` protocol.

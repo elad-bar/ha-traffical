@@ -21,6 +21,8 @@ The integration should make that visible on the map and in automations without t
 
 Out of scope for v1: driver GPS upload, route builder, join/QR, marketplace, incidents, checking in *other* passengers.
 
+Download diagnostics from Settings → Devices & services → Traffical → ⋮. The file is for classifying auth vs HTTP vs SignalR vs disabled entities. It must not include GPS, OTP, tokens, or child names.
+
 ---
 
 ## Runtime model

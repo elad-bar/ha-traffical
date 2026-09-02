@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Live bus GPS over `MobileDashboardHub` (Azure SignalR negotiate redirect, `Monitor(rideId)`, `ReceiveCoordinates`, `ArrivedToStation`), attached while a ride is ongoing and detached when it finishes
 - Always-on `mobileHub` stream: `UpdateRideStatus` drives ride-status transitions and live-GPS attach/detach, `RouteSuccessfulSave` triggers a debounced refresh of the affected day
 - Station `geo_location` markers for today's path, shown for the live ride or the next unfinished ride today
+- Debug-grade config-entry and device diagnostics: last HTTP status/shape, dual SignalR hub health, ride summaries, and entity registry (no GPS, OTP, or tokens)
 - Ride device triggers for status, start, finish, check-in, arrived station, and approaching stop, matching the `traffical_*` events
 - Check-in, check-out, and not-coming buttons gated by passenger policy and ride status
 - Hebrew (`he`) Home Assistant UI translations for the config flow, entities, and device triggers

@@ -84,6 +84,8 @@ One INFO summary per poll tick that changed ride membership; per-platform entity
 - **debug:** `POST /api/Mobile/Rides/…`, check-in statuses, monitoring path GET, hub invoke, frame counts
 - **warning:** `login failed`, HTTP non-OK, hub connect failed
 
+Last HTTP snapshots for **diagnostics** are RAM-only (`query_log_for_diagnostics`). They are not log lines. Do not INFO-dump them. GPS, OTP, and tokens stay out of the diagnostics file.
+
 ## Message style
 
 - Prefer stable, grep-friendly prefixes: `config flow failed step=user`, `auth failure source=http`.

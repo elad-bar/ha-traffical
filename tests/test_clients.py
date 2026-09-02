@@ -303,12 +303,76 @@ async def test_mobile_list_rides() -> None:
     method, url, kwargs = session.calls[0]
     assert method == "POST"
     assert "Rides/Municipality" in url
+    log = client.query_log_for_diagnostics()
+    key = next(iter(log["account"]))
+    assert "list_rides" in key
+    assert log["account"][key]["request"]["http_status"] == 200
+    assert log["account"][key]["shape"]["count"] == 1
+    assert log["rides"] == {}
 
 
 @pytest.mark.asyncio
-async def test_api_client_raises() -> None:
+async def test_api_client_query_log_skips_token_and_records_failures() -> None:
     resp = _FakeResp(500, "nope")
     session = _FakeSession(resp)
     client = ApiClient("https://api.example", session)  # type: ignore[arg-type]
     with pytest.raises(Exception):
         await client.get("/x", action="x")
+    log = client.query_log_for_diagnostics()
+    key = next(iter(log["account"]))
+    assert log["account"][key]["request"]["http_status"] == 500
+    assert log["account"][key]["request"]["error"]
+
+    token_resp = _FakeResp(200, {"access_token": "tokensecret", "refresh_token": "r"})
+    identity = IdentityClient("https://id.example", _FakeSession(token_resp))
+    body = await identity.refresh("refreshsecret")
+    assert body["access_token"] == "tokensecret"
+    token_log = identity.query_log_for_diagnostics()
+    assert token_log["account"] == {}
+    assert "tokensecret" not in str(token_log)
+
+
+@pytest.mark.asyncio
+async def test_api_client_query_log_scopes_ride_id() -> None:
+    resp = _FakeResp(200, {"ok": True})
+    client = MobileClient(
+        "https://api.example", _FakeSession(resp)
+    )  # type: ignore[arg-type]
+    await client.check_in_passenger(39306112, 10, True)
+    log = client.query_log_for_diagnostics(39306112)
+    assert "39306112" in log["rides"]
+    assert any("checkin_passenger" in key for key in log["rides"]["39306112"])
+
+
+@pytest.mark.asyncio
+async def test_userinfo_query_log_has_no_profile_shape() -> None:
+    resp = _FakeResp(200, {"sub": "user-sub-1", "phone": "0501234567"})
+    identity = IdentityClient("https://id.example", _FakeSession(resp))
+    await identity.userinfo()
+    log = identity.query_log_for_diagnostics()
+    record = next(iter(log["account"].values()))
+    assert record["request"]["http_status"] == 200
+    assert record["shape"] is None
+    assert "0501234567" not in str(log)
+
+
+def test_signalr_snapshot_has_both_hubs_without_gps() -> None:
+    hubs = SignalRHubs(
+        object(),  # type: ignore[arg-type]
+        "https://api.example",
+        lambda: {"access_token": "token"},
+    )
+    hubs.track_ride_id = 39306112
+    hubs._frames = {"invocation:ReceiveCoordinates": 2}
+    hubs._mobile_frames = {"invocation:UpdateRideStatus": 1}
+    hubs._dashboard_diag = {"last_event": "ReceiveCoordinates"}
+    hubs._mobile_diag = {"last_event": "UpdateRideStatus"}
+    snap = hubs.snapshot_for_diagnostics()
+    blob = str(snap)
+    assert snap["dashboard"]["track_ride_id"] == 39306112
+    assert snap["dashboard"]["last_event"] == "ReceiveCoordinates"
+    assert snap["mobile"]["last_event"] == "UpdateRideStatus"
+    assert snap["dashboard"]["ws_open"] is False
+    assert "token" not in blob
+    assert "lat" not in blob
+    assert "32." not in blob

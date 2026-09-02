@@ -165,6 +165,11 @@ logger:
 
 Do not paste tokens, OTP codes, full phone numbers, child names, or GPS traces in issues.
 
+If something is wrong with rides, check-in, or live GPS, download diagnostics
+(Settings → Devices & services → Traffical → ⋮ → Download diagnostics) **and**
+attach logs. Diagnostics include last HTTP status/shape and SignalR hub health;
+they do not include GPS, OTP, or tokens.
+
 Developer logging contract: [docs/logging.md](docs/logging.md).
 
 ## Contributing
