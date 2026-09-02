@@ -1,0 +1,74 @@
+# Project (decompiled APK, secrets, HTTP dumps)
+/app/
+/data/
+/debug/
+
+# Bytecode / caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+share/python-wheels/
+
+# Virtualenvs
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.*
+
+# Packaging / install
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Test / type / lint caches
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+cover/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Jupyter
+.ipynb_checkpoints
+
+# IDEs / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
