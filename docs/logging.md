@@ -59,7 +59,7 @@ Between two INFO milestones in a flow, there should be enough DEBUG to trace the
 - Flow boundaries (started, submit, created entry, success reload, abort) → **info**.
 - Unexpected exceptions in a flow step → **exception** if truly unknown; handled cases → **warning** with context.
 
-Phase A stub flow only logs start and created entry (no OTP yet).
+Phase A stub flow only logged start and created entry. The live flow logs OTP request and login outcome (never the code).
 
 ## Lifecycle (`__init__.py`)
 

@@ -8,13 +8,7 @@ Run `pytest` from the **repo root**. There is no coverage gate.
 
 [`tests/conftest.py`](../../tests/conftest.py) loads `pytest_homeassistant_custom_component` only when `fcntl` exists. Native Windows Python does not; HA-runtime modules listed in `_HASS_TEST_FILES` are skipped.
 
-**Phase A:** `_HASS_TEST_FILES` is empty. There are no config-flow / coordinator / setup-unload tests yet. Changelog tests run on Windows and Linux.
-
-**Phase B (intended skip list)** when those files exist:
-
-- `test_config_flow.py`
-- `test_coordinator.py`
-- `test_setup_unload.py`
+**HA plugin skip list** (`_HASS_TEST_FILES`): `test_config_flow.py`, `test_coordinator.py`, `test_setup_unload.py`. Changelog and HA-free tests run on Windows and Linux.
 
 All other tests still run on a Windows host. A green native Windows `pytest` is **not** the same as CI if you changed config flow, coordinator, or setup/unload.
 
@@ -24,14 +18,14 @@ All other tests still run on a Windows host. A green native Windows `pytest` is 
 
 Prefer HA-free unit tests for REST / SignalR / store. Use the HA plugin (`hass`, `MockConfigEntry`) for config flow, coordinator, and setup/unload.
 
-| Change                                          | Extend or add                                                                                                 |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Manifest version bump                           | `test_changelog_release.py` — changelog must have a matching `## [x.y.z]` section                             |
-| New HA-free module (Phase B)                    | `_HA_FREE_MODULES` in `test_ha_free_imports.py`                                                               |
-| UI strings / locales (when locales grow)        | `test_translations.py`                                                                                        |
-| REST / SignalR / store (as modules land)        | HA-free tests next to those modules                                                                           |
-| Config flow, coordinator, load/unload (Phase B) | `test_config_flow.py`, `test_coordinator.py`, `test_setup_unload.py` (full suite: CI / WSL / Linux container) |
-| Catalog / platform semantics (Phase B)          | entity / platform tests when platforms exist                                                                  |
+| Change                                   | Extend or add                                                                                                 |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Manifest version bump                    | `test_changelog_release.py` — changelog must have a matching `## [x.y.z]` section                             |
+| New HA-free module (Phase B)             | `_HA_FREE_MODULES` in `test_ha_free_imports.py`                                                               |
+| UI strings / locales (when locales grow) | `test_translations.py`                                                                                        |
+| REST / SignalR / store                   | HA-free tests next to those modules                                                                           |
+| Config flow, coordinator, load/unload    | `test_config_flow.py`, `test_coordinator.py`, `test_setup_unload.py` (full suite: CI / WSL / Linux container) |
+| Catalog / platform semantics (Phase B)   | entity / platform tests when platforms exist                                                                  |
 
 Do not copy Carlinko changelog assertions (WebSocket / vehicle bullets) into Traffical tests.
 

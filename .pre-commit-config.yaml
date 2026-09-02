@@ -4,15 +4,13 @@ repos:
     hooks:
       - id: pyupgrade
         args: [--py39-plus]
-        exclude: ^engine/
   - repo: https://github.com/psf/black
     rev: 26.5.1
     hooks:
       - id: black
         args:
           - --quiet
-        files: ^((custom_components|tests)/.+)?[^/]+\.py$
-        exclude: ^engine/
+        files: ^((custom_components|tests|engine)/.+)?[^/]+\.py$
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.3
     hooks:
@@ -22,7 +20,7 @@ repos:
           - --skip="./.*,./*.svg,*.svg,*.csv,*.json"
           - --quiet-level=2
         exclude_types: [csv, json]
-        exclude: ^(engine/|debug/|data/|app/)
+        exclude: ^(debug/|data/|app/)
   - repo: https://github.com/PyCQA/autoflake
     rev: v2.4.0
     hooks:
@@ -30,7 +28,6 @@ repos:
         args:
           - --in-place
           - --remove-all-unused-imports
-        exclude: ^engine/
   - repo: https://github.com/PyCQA/flake8
     rev: 7.3.0
     hooks:
@@ -42,7 +39,6 @@ repos:
           - flake8-noqa
           - mccabe
         files: ^(custom_components|tests)/.+\.py$
-        exclude: ^engine/
   - repo: https://github.com/PyCQA/bandit
     rev: 1.9.4
     hooks:
@@ -56,7 +52,6 @@ repos:
     rev: 9.0.1
     hooks:
       - id: isort
-        exclude: ^engine/
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -65,11 +60,10 @@ repos:
       - id: check-yaml
       - id: check-merge-conflict
       - id: debug-statements
-        exclude: ^engine/
       - id: end-of-file-fixer
-        exclude: ^(engine/|docs/(product-overview|api-reference|passenger-experience|home-assistant-integration)\.md)
+        exclude: ^docs/(product-overview|api-reference|passenger-experience|home-assistant-integration)\.md
       - id: trailing-whitespace
-        exclude: ^(engine/|docs/(product-overview|api-reference|passenger-experience|home-assistant-integration)\.md)
+        exclude: ^docs/(product-overview|api-reference|passenger-experience|home-assistant-integration)\.md
       - id: check-added-large-files
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.38.0
@@ -79,4 +73,4 @@ repos:
     rev: v3.0.0-alpha.4
     hooks:
       - id: prettier
-        exclude: ^(engine/|debug/|data/|app/|docs/(product-overview|api-reference|passenger-experience|home-assistant-integration)\.md)
+        exclude: ^(debug/|data/|app/|docs/(product-overview|api-reference|passenger-experience|home-assistant-integration)\.md)

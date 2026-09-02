@@ -8,14 +8,14 @@ CI runs Python **3.13**. Black/pyupgrade still target **3.9+**. Runtime deps: [`
 
 ## Current vs target
 
-|         | **Today (Phase A)**                                 | **Target (Phase B)**                                                               |
-| ------- | --------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Product | Stub HA integration + fat CLI                       | Native HA is the product                                                           |
-| Clients | `engine/` (`requests`, `signalrcore`)               | HA-free modules under `custom_components/traffical/managers/`                      |
-| Engine  | Many Python files (`entrypoint.py`, clients, store) | `engine/entrypoint.py` (+ HA-free path mount) only                                 |
-| HTTP    | `requests` / `signalrcore` in `engine/`             | One stack: `aiohttp` REST plus an **async** SignalR client (HA has no SignalR SDK) |
+|         | **Today**                                                               |
+| ------- | ----------------------------------------------------------------------- |
+| Product | Native HA integration + thin CLI                                        |
+| Clients | HA-free modules under `custom_components/traffical/managers/`           |
+| Engine  | `engine/entrypoint.py` + `engine/ha_free_path.py`                       |
+| HTTP    | `aiohttp` REST plus an **async** SignalR client (HA has no SignalR SDK) |
 
-Until Phase B, **do not** reformat or relocate `engine/` clients. Pre-commit excludes `engine/` from Black/flake8/isort/pyupgrade/autoflake. Do not add a second copy of those clients under `custom_components/`.
+Do **not** add a second copy of clients under `engine/`. Pre-commit formats `engine/` and `custom_components/`.
 
 ## Directory structure
 
@@ -26,7 +26,7 @@ Two roots. Do not flatten `common/`, `managers/`, `models/`, or `translations/` 
 | Folder                         | Put here                                           | Do not put here                         |
 | ------------------------------ | -------------------------------------------------- | --------------------------------------- |
 | `custom_components/traffical/` | The Home Assistant integration package (see below) | —                                       |
-| `engine/`                      | CLI (today: full clients; target: harness only)    | A second copy of clients after Phase B  |
+| `engine/`                      | CLI harness (`entrypoint.py`, `ha_free_path.py`)   | A second copy of clients                |
 | `tests/`                       | pytest                                             | Runtime code                            |
 | `docs/`                        | Standards and domain docs                          | Code                                    |
 | `scripts/`                     | One-off generators                                 | Imports from the integration at runtime |
@@ -107,15 +107,15 @@ Shared contract for integration and engine. Named HA lines, flows, and `caplog` 
 
 ## HTTP and realtime
 
-**Current (engine):** `requests` and `signalrcore`. Explicit timeouts. Session/store owned by the CLI.
+**Current:** `aiohttp` and a thin async SignalR client (`managers/signalr_client.py`). Explicit timeouts. Session owned at the coordinator or engine boundary; pass it into clients.
 
-**Target:** one asyncio stack shared by HA and the CLI: `aiohttp` for REST, plus an **async SignalR** hub client. Own the session at the coordinator or engine boundary; pass it into clients. `python-dotenv` is engine-only. Integration credentials come from the config entry.
+**Target:** same. `python-dotenv` is engine-only if used. Integration credentials come from the config entry.
 
-Home Assistant does **not** provide SignalR. The [HA WebSocket API](https://developers.home-assistant.io/docs/api/websocket/) is frontend ↔ HA, not Traffical hubs. Hub protocol stays in this repo ([api-reference.md](../api-reference.md)); product attach/detach stays in [home-assistant-integration.md](../home-assistant-integration.md). HA’s rules that apply: [do not block the event loop](https://developers.home-assistant.io/docs/asyncio_blocking_operations), reuse [HA’s `aiohttp` session](https://developers.home-assistant.io/docs/api/clientsession) in the integration, list extra PyPI deps in `manifest.json` `requirements`.
+Home Assistant does **not** provide SignalR. The [HA WebSocket API](https://developers.home-assistant.io/docs/api/websocket/) is frontend ↔ HA, not Traffical hubs. Hub protocol stays in this repo ([api-reference.md](../api-reference.md)); product attach/detach stays in [home-assistant-integration.md](../home-assistant-integration.md). HA’s rules that apply: [do not block the event loop](https://developers.home-assistant.io/docs/asyncio_blocking_operations). Own an `aiohttp` session per config entry / CLI with TLS verify minus `VERIFY_X509_STRICT` (Mashcal intermediates). List extra PyPI deps in `manifest.json` `requirements` if any.
 
 **Hub client (HA-free `managers/`):** take `aiohttp.ClientSession` and a token callback; do not import `homeassistant`. v1 is `MobileDashboardHub`, invoke `Monitor(rideId)`, handle `ReceiveCoordinates` / `ArrivedToStation`, disconnect on unload and when the ride is finished. Prefer a thin negotiate + `session.ws_connect` (JSON, `\x1e` records) unless a Core SignalR library (`pysignalr` or similar) is proven against Live and can use the injected session. Do not use old ASP.NET (`/signalr`) clients. Do not port the engine’s unverified SSL context into the integration.
 
-**If the client stays sync (`signalrcore`):** only as a short Phase B spike. Run start/stop in an executor; marshal hub callbacks onto the loop (`call_soon_threadsafe` / `hass.add_job`) before `coordinator.async_set_updated_data`. Do not write entity state from a worker thread.
+**If a spike still uses sync (`signalrcore`):** do not land it. Historical note only: start/stop would run in an executor; hub callbacks must marshal onto the loop before `coordinator.async_set_updated_data`.
 
 **`iot_class`:** keep `cloud_polling` while HTTP is the source of ride / check-in truth and SignalR is a live overlay (GPS / `ArrivedToStation`). That matches quality-scale `appropriate-polling`.
 

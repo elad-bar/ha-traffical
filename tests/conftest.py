@@ -11,9 +11,14 @@ import sys
 
 import pytest
 
-# Files that need the HA pytest plugin (hass fixture / MockConfigEntry).
-# Phase A: none. Phase B: test_config_flow.py, test_coordinator.py, test_setup_unload.py.
-_HASS_TEST_FILES = frozenset()
+# Phase B: HA plugin tests (config flow, coordinator, setup/unload).
+_HASS_TEST_FILES = frozenset(
+    {
+        "test_config_flow.py",
+        "test_coordinator.py",
+        "test_setup_unload.py",
+    }
+)
 
 _HASS_RUNTIME_AVAILABLE = sys.platform != "win32"
 try:

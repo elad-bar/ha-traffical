@@ -1,31 +1,31 @@
 rules:
-  config-flow: todo
-  entity-unique-id: todo
-  entity-unavailable: todo
-  diagnostics: todo
-  parallel-updates: todo
-  reauthentication-flow: todo
-  exception-translations: todo
-  reconfiguration-flow: todo
-  entity-translations: todo
+  config-flow: done
+  entity-unique-id: done
+  entity-unavailable: done
+  diagnostics: done
+  parallel-updates: done
+  reauthentication-flow: done
+  exception-translations: done
+  reconfiguration-flow: exempt
+  entity-translations: done
   icon-translations: todo
   entity-category: todo
-  entity-event-setup: todo
+  entity-event-setup: done
   stale-devices: todo
-  test-before-setup: todo
+  test-before-setup: done
   log-when-unavailable: todo
-  config-entry-unloading: todo
-  docs-installation-instructions: todo
+  config-entry-unloading: done
+  docs-installation-instructions: done
   docs-configuration-parameters: todo
   docs-known-limitations: todo
 
-  action-setup: todo
+  action-setup: exempt
 
   appropriate-polling:
-    status: todo
+    status: done
     comment: >-
-      Stub only. iot_class stays cloud_polling: HTTP is the source of ride /
-      check-in truth; SignalR is a live overlay while a ride is Ongoing.
+      iot_class is cloud_polling: HTTP is the source of ride / check-in truth;
+      SignalR is a live overlay while a ride is Ongoing.
 
   discovery:
     status: exempt

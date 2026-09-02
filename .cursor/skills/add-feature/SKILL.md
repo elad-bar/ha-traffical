@@ -20,7 +20,7 @@ Read before editing:
 ## Checklist
 
 1. **Classify**: entity / REST or SignalR / HA service / options / engine-only. SignalR protocol lives in the HA-free hub client (`managers/`); coordinator / HA glue owns connect-when-Ongoing and marshaling onto the event loop ([coding.md](../../../docs/standards/coding.md)).
-2. **Place the code** in the matching layer. Platforms stay thin. Until Phase B, do not relocate `engine/` clients into the package as a drive-by. After Phase B, do not add engine Python besides `engine/entrypoint.py`. Do not import `homeassistant` in HA-free modules; extend `tests/test_ha_free_imports.py` if you add one.
+2. **Place the code** in the matching layer. Platforms stay thin. Do not add engine Python besides `engine/entrypoint.py` and `engine/ha_free_path.py`. Do not import `homeassistant` in HA-free modules; extend `tests/test_ha_free_imports.py` if you add one.
 3. **Entities / strings:** follow the HA design (account hub + child device per `routeId` + `direction`, not per daily `rideId`). Update `strings.json` and `translations/en.json` together. If English terms were added or changed, follow [translate-locales](../translate-locales/SKILL.md). Translation procedure: [CONTRIBUTING.md](../../../CONTRIBUTING.md).
 4. **API**: [docs/api-reference.md](../../../docs/api-reference.md) and [docs/passenger-experience.md](../../../docs/passenger-experience.md). No opcodes, VIN, car-region, or vehicle blob decode.
 5. **Logs**: follow [docs/logging.md](../../../docs/logging.md). No OTP, tokens, full phone, child names, or GPS at INFO.

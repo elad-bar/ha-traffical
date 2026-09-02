@@ -1,38 +1,42 @@
+"""File-backed session store (HA-free)."""
+
 from __future__ import annotations
 
 import json
 import uuid
+from pathlib import Path
 from typing import Any
 
-from engine.consts import CONFIG_PATH, DATA_DIR, DEFAULT_LANGUAGE, ENVIRONMENTS
-from engine.helpers import now_iso
+from ..common.consts import CONFIG_PATH, DEFAULT_LANGUAGE, ENVIRONMENTS
+from ..common.helpers import now_iso
 
 
 class SessionStore:
-    def __init__(self) -> None:
+    def __init__(self, path: Path | None = None) -> None:
+        self.path = path or CONFIG_PATH
         self.data: dict[str, Any] = {}
 
     def load(self) -> dict[str, Any]:
-        if not CONFIG_PATH.is_file():
+        if not self.path.is_file():
             self.data = {}
             return self.data
         try:
-            self.data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            self.data = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             self.data = {}
         return self.data
 
     def save(self) -> None:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        CONFIG_PATH.write_text(
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(
             json.dumps(self.data, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
 
     def clear(self) -> bool:
         self.data = {}
-        if CONFIG_PATH.is_file():
-            CONFIG_PATH.unlink()
+        if self.path.is_file():
+            self.path.unlink()
             return True
         return False
 
@@ -45,6 +49,9 @@ class SessionStore:
         self.data.setdefault("app_hash", "")
         if not self.data.get("device_id"):
             self.data["device_id"] = str(uuid.uuid4())
+
+    def load_from_mapping(self, data: dict[str, Any]) -> None:
+        self.data = dict(data)
 
     @property
     def phone(self) -> str:
@@ -90,6 +97,10 @@ class SessionStore:
     def app_hash(self) -> str:
         return self.data.get("app_hash") or ""
 
+    @property
+    def child_id(self) -> str:
+        return str(self.data.get("child_id") or "")
+
     def set_otp(self, ticket: str, expired_in: Any) -> None:
         self.data["otp_ticket"] = ticket
         self.data["otp_expired_in"] = expired_in
@@ -101,9 +112,11 @@ class SessionStore:
         self.data.pop("otp_requested_at", None)
 
     def set_tokens(self, token_body: dict[str, Any]) -> None:
+        previous = self.tokens
         self.data["tokens"] = {
             "access_token": token_body.get("access_token"),
-            "refresh_token": token_body.get("refresh_token"),
+            "refresh_token": token_body.get("refresh_token")
+            or previous.get("refresh_token"),
             "id_token": token_body.get("id_token"),
             "token_type": token_body.get("token_type") or "Bearer",
             "expires_in": token_body.get("expires_in"),
@@ -122,3 +135,16 @@ class SessionStore:
 
     def set_policies(self, policies: Any) -> None:
         self.data["policies"] = policies
+
+    def persist_fields(self) -> dict[str, Any]:
+        return {
+            "environment": self.environment,
+            "api_url": self.api_url,
+            "identity_url": self.identity_url,
+            "language": self.language,
+            "phone": self.phone,
+            "device_id": self.device_id,
+            "app_hash": self.app_hash,
+            "tokens": self.tokens,
+            "child_id": self.data.get("child_id"),
+        }

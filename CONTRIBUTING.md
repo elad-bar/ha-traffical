@@ -31,7 +31,6 @@ Do not commit API keys.
 - Run: `python engine/entrypoint.py` from the repo root (OTP login CLI).
 - Install hooks once: `pip install -r requirements-dev.txt && pre-commit install`.
   Hooks run on commit (black, flake8, isort, bandit, yamllint, prettier, etc.).
-  `engine/` is excluded from Python formatters until Phase B.
   To run everything against the tree: `pre-commit run --all-files`.
   Pull requests also run [CI](.github/workflows/ci.yml) (pre-commit, hassfest, HACS, pytest).
 
@@ -62,8 +61,8 @@ Before bumping the manifest for a release (agents: [changelog-version skill](.cu
 
 1. Keep changes focused — one feature/fix per PR.
 2. Runtime pip deps live in [`requirements.txt`](requirements.txt)
-   (`requests`, `signalrcore`, `homeassistant` for local typing / IDE).
-   After Phase B, HA-free code under `custom_components/traffical/models/` and the API/SignalR clients in
+   (`aiohttp`, `homeassistant` for local typing / IDE).
+   HA-free code under `custom_components/traffical/models/` and the API/SignalR clients in
    `managers/` must stay free of `homeassistant` imports. Test-only deps (including
    `pre-commit`) are in `requirements-dev.txt`.
 3. **Never** include `.env`, `config.json`, tokens, API keys, OTP codes, full phone numbers,

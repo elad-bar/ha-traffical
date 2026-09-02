@@ -101,45 +101,45 @@ Product target: [home-assistant-integration.md](./home-assistant-integration.md)
 | Shared consts (HA-free)          | `common/consts.py`                                     |
 | CLI                              | `engine/entrypoint.py` + `engine/ha_free_path.py` only |
 
-- [ ] Move clients/store/models out of `engine/` into `custom_components/traffical/`
-- [ ] Shrink `engine/` to entrypoint + synthetic `traffical` package mount (Carlinko `ha_free_path.py` pattern)
-- [ ] `tests/test_ha_free_imports.py` — `_HA_FREE_MODULES` for Traffical
-- [ ] Update `engine/README.md` (layout table)
-- [ ] Drop the Phase A pre-commit exclude for `engine/` once it is thin
+- [x] Move clients/store/models out of `engine/` into `custom_components/traffical/`
+- [x] Shrink `engine/` to entrypoint + synthetic `traffical` package mount (Carlinko `ha_free_path.py` pattern)
+- [x] `tests/test_ha_free_imports.py` — `_HA_FREE_MODULES` for Traffical
+- [x] Update `engine/README.md` (layout table)
+- [x] Drop the Phase A pre-commit exclude for `engine/` once it is thin
 
 ### B2. HTTP / realtime stack
 
-- [ ] Choose the HTTP / SignalR stack: target is `aiohttp` REST + an **async** hub client we own (thin negotiate + `ws_connect`, or a Core SignalR library proven on Live). HA has no SignalR SDK. `signalrcore` + executor is a spike only, not the long-term stack. Details: [coding.md](./standards/coding.md)
-- [ ] Timeouts explicit; session owned at coordinator / engine boundary
-- [ ] `python-dotenv` engine-only; HA credentials from the config entry
-- [ ] Update `requirements.txt` to match the chosen stack
-- [ ] Update `docs/standards/coding.md` to remove the “engine still uses requests” exception when true
+- [x] Choose the HTTP / SignalR stack: target is `aiohttp` REST + an **async** hub client we own (thin negotiate + `ws_connect`, or a Core SignalR library proven on Live). HA has no SignalR SDK. `signalrcore` + executor is a spike only, not the long-term stack. Details: [coding.md](./standards/coding.md)
+- [x] Timeouts explicit; session owned at coordinator / engine boundary
+- [x] `python-dotenv` engine-only; HA credentials from the config entry
+- [x] Update `requirements.txt` to match the chosen stack
+- [x] Update `docs/standards/coding.md` to remove the “engine still uses requests” exception when true
 
 ### B3. Home Assistant integration (real, not stub)
 
-- [ ] Config flow: phone + OTP, stored refresh token
-- [ ] Coordinator: poll rides / check-in / details on interval; faster near ride start
-- [ ] Auto SignalR when ride is `Ongoing` / `OngoingMonitored`; disconnect on finished
-- [ ] Devices: account hub + child per `routeId` + `direction` (not per daily `rideId`)
-- [ ] Platforms (thin): `sensor`, `binary_sensor`, `button`, `select`, `device_tracker` as in the HA design
-- [ ] Diagnostics (redacted)
-- [ ] Services only if the design needs them (`services.py` / `services.yaml`)
-- [ ] Options flow if poll interval / child select needs it
+- [x] Config flow: phone + OTP, stored refresh token
+- [x] Coordinator: poll rides / check-in / details on interval; faster near ride start
+- [x] Auto SignalR when ride is `Ongoing` / `OngoingMonitored`; disconnect on finished
+- [x] Devices: account hub + child per `routeId` + `direction` (not per daily `rideId`)
+- [x] Platforms (thin): `sensor`, `binary_sensor`, `button`, `select`, `device_tracker` as in the HA design
+- [x] Diagnostics (redacted)
+- [x] Services only if the design needs them (`services.py` / `services.yaml`)
+- [x] Options flow if poll interval / child select needs it
 
 ### B4. Tests and translations
 
-- [ ] HA-runtime: `test_config_flow.py`, `test_coordinator.py`, `test_setup_unload.py`
-- [ ] HA-free: REST / SignalR / store / decode as modules land
-- [ ] `test_translations.py`; generate/fix scripts retargeted to `traffical` when locales grow
-- [ ] Windows skip list in `conftest.py` matches real HA-plugin test files
-- [ ] Full suite green on Linux (CI); native Windows pytest still skips HA plugin tests
+- [x] HA-runtime: `test_config_flow.py`, `test_coordinator.py`, `test_setup_unload.py`
+- [x] HA-free: REST / SignalR / store / decode as modules land
+- [x] `test_translations.py`; generate/fix scripts retargeted to `traffical` when locales grow
+- [x] Windows skip list in `conftest.py` matches real HA-plugin test files
+- [x] Full suite green on Linux (CI); native Windows pytest still skips HA plugin tests
 
 ### B5. Phase B done when
 
-- [ ] Engine CLI uses the same package as HA (no duplicated clients)
-- [ ] Integration matches [home-assistant-integration.md](./home-assistant-integration.md) v1 scope
-- [ ] Skills / standards no longer describe a stub or a fat engine
-- [ ] CI release path: bump `manifest.json` + `CHANGELOG.md`, merge to `main`
+- [x] Engine CLI uses the same package as HA (no duplicated clients)
+- [x] Integration matches [home-assistant-integration.md](./home-assistant-integration.md) v1 scope
+- [x] Skills / standards no longer describe a stub or a fat engine
+- [x] CI release path: bump `manifest.json` + `CHANGELOG.md`, merge to `main`
 
 ---
 
@@ -154,8 +154,8 @@ Product target: [home-assistant-integration.md](./home-assistant-integration.md)
 
 ## Progress log
 
-| Date       | Phase | Note                                                                       |
-| ---------- | ----- | -------------------------------------------------------------------------- |
-| 2026-09-02 | —     | Research complete; this checklist created. No scaffolding applied yet.     |
-| 2026-09-02 | A     | Stub integration, CI, standards, skills. Engine clients unchanged.         |
-| 2026-09-02 | B     | Docs: HA has no SignalR SDK; Phase B target is async hub client + aiohttp. |
+| Date       | Phase | Note                                                                   |
+| ---------- | ----- | ---------------------------------------------------------------------- |
+| 2026-09-02 | —     | Research complete; this checklist created. No scaffolding applied yet. |
+| 2026-09-02 | A     | Stub integration, CI, standards, skills. Engine clients unchanged.     |
+| 2026-09-02 | B     | Native HA integration, aiohttp + async SignalR, thin engine CLI.       |

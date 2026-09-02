@@ -3,14 +3,76 @@
     "step": {
       "user": {
         "title": "Traffical",
-        "description": "Placeholder setup. Phone and OTP login will be added in a later release."
+        "description": "Sign in with the phone number used in the Traffical app.",
+        "data": {
+          "environment": "Environment",
+          "phone": "Phone"
+        }
+      },
+      "otp": {
+        "title": "Enter the code",
+        "description": "A one-time code was sent by SMS.",
+        "data": {
+          "otp": "OTP code"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in again",
+        "description": "A new code was sent to {phone}.",
+        "data": {
+          "otp": "OTP code"
+        }
       }
     },
     "error": {
+      "invalid_auth": "Login failed. Check the phone number or OTP.",
+      "cannot_connect": "Could not reach Traffical.",
       "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "Traffical is already configured."
+      "already_configured": "This Traffical account is already configured.",
+      "cannot_connect": "Could not reach Traffical."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Traffical options",
+        "data": {
+          "poll_interval": "Poll interval (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_ride": { "name": "Next ride" },
+      "status": { "name": "Status" },
+      "my_station": { "name": "My station" },
+      "destination": { "name": "Destination" },
+      "driver": { "name": "Driver" },
+      "vehicle": { "name": "Vehicle" }
+    },
+    "binary_sensor": {
+      "session": { "name": "Session" },
+      "checked_in": { "name": "Checked in" }
+    },
+    "button": {
+      "refresh": { "name": "Refresh" },
+      "check_in": { "name": "Check in" },
+      "check_out": { "name": "Check out" },
+      "not_coming": { "name": "Not coming" }
+    },
+    "select": {
+      "child": { "name": "Child" }
+    },
+    "device_tracker": {
+      "bus": { "name": "Bus" }
+    }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Could not connect to Traffical."
     }
   }
 }

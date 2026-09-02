@@ -10,15 +10,14 @@ Product design: [docs/home-assistant-integration.md](docs/home-assistant-integra
 API notes: [docs/api-reference.md](docs/api-reference.md).
 Passenger flow: [docs/passenger-experience.md](docs/passenger-experience.md).
 
-**Status:** Phase A ships a **stub** (config flow placeholder, no OTP yet) so HACS / hassfest /
-CI can run. The working login CLI remains `python engine/entrypoint.py`. Real HA platforms land
-in a later release.
+**Status:** Native Home Assistant integration (phone + OTP, rides, check-in, live GPS).
+The CLI `python engine/entrypoint.py` uses the same HA-free clients.
 
 ## Prerequisites
 
 - Home Assistant (see `hacs.json` for the tested version)
 - A Traffical passenger or parent account
-- Network access from Home Assistant to Traffical cloud services (when the stub is replaced)
+- Network access from Home Assistant to Traffical cloud services
 
 ## Install
 
@@ -36,10 +35,8 @@ Copy `custom_components/traffical/` into
 
 ## Configuration
 
-Phase A: the config flow is a placeholder and does not request phone or OTP.
-
-Target (Phase B): one entry per account; stored refresh token; hub device plus a child device
-per recurring ride (`routeId` + `direction`).
+One entry per account (phone + OTP). A refresh token is stored on the config entry.
+The account is a hub device; each recurring ride is a child device (`routeId` + `direction`).
 
 ## Engine CLI
 
