@@ -13,7 +13,7 @@ from .common.base_entity import TrafficalEntity
 from .common.entity_descriptions import HUB_SENSORS, RIDE_SENSORS
 from .common.entity_setup import async_setup_entities
 from .managers.coordinator import TrafficalCoordinator
-from .models.rides import is_your_station
+from .models.rides import Ride
 
 PARALLEL_UPDATES = 1
 
@@ -46,7 +46,7 @@ class TrafficalSensor(TrafficalEntity, SensorEntity):
         if self.entity_key == "status":
             return ride.get("status")
         if self.entity_key == "my_station":
-            return self._my_station_label(ride, details, info)
+            return self._my_station_label(ride)
         if self.entity_key == "destination":
             return self._destination_label(details)
         if self.entity_key == "driver":
@@ -101,22 +101,20 @@ class TrafficalSensor(TrafficalEntity, SensorEntity):
             return None
         return ride.get("name")
 
-    def _my_station_label(self, ride, details, info) -> str | None:
-        member_id = self.coordinator.member_id()
-        stop = str(info.get("passengerStationName") or "")
-        for station in details.get("stations") or []:
-            if isinstance(station, dict) and is_your_station(station, stop, member_id):
-                return str(station.get("address") or station.get("name") or stop)
-        return stop or None
+    def _my_station_label(self, ride) -> str | None:
+        cached = Ride.from_cache(ride)
+        station = cached.your_station(self.coordinator.member_id())
+        stop = cached.passenger_stop
+        if station is None:
+            return stop or None
+        return station.address or station.name or stop
 
     def _destination_label(self, details) -> str | None:
-        for station in details.get("stations") or []:
-            if isinstance(station, dict) and station.get("isTarget"):
-                return str(station.get("name") or station.get("address") or "")
-        return None
+        station = Ride({}, details).target_station()
+        if station is None:
+            return None
+        return station.name or station.address
 
     def _destination_address(self, details) -> str | None:
-        for station in details.get("stations") or []:
-            if isinstance(station, dict) and station.get("isTarget"):
-                return str(station.get("address") or "")
-        return None
+        station = Ride({}, details).target_station()
+        return station.address if station is not None else None

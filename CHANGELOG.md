@@ -8,15 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Native Home Assistant integration: phone + OTP config flow, coordinator poll, auto SignalR live GPS, hub + ride devices
-- Home Assistant custom-component scaffolding: stub integration (`traffical`), HACS metadata, CI, and changelog/release wiring
-- Ride device triggers for status, start, finish, check-in, arrived station, and approaching stop (same as the `traffical_*` events)
-- Hebrew (`he`) Home Assistant UI translations for config flow, entities, and device triggers
-
-### Changed
-
-- Station `geo_location` markers show only for the live ride, otherwise the next unfinished ride today
-
-### Removed
-
-- Hub session binary sensor; session health stays internal (`session_ok` / reauth)
+- Native Home Assistant integration: phone + OTP config flow with reauth, coordinator refresh, hub device per account, and a ride device per recurring line (`routeId` + `direction`)
+- Live bus GPS over `MobileDashboardHub` (Azure SignalR negotiate redirect, `Monitor(rideId)`, `ReceiveCoordinates`, `ArrivedToStation`), attached while a ride is ongoing and detached when it finishes
+- Always-on `mobileHub` stream: `UpdateRideStatus` drives ride-status transitions and live-GPS attach/detach, `RouteSuccessfulSave` triggers a debounced refresh of the affected day
+- Station `geo_location` markers for today's path, shown for the live ride or the next unfinished ride today
+- Ride device triggers for status, start, finish, check-in, arrived station, and approaching stop, matching the `traffical_*` events
+- Check-in, check-out, and not-coming buttons gated by passenger policy and ride status
+- Hebrew (`he`) Home Assistant UI translations for the config flow, entities, and device triggers
+- Engine CLI (`engine/entrypoint.py`) sharing the integration's HA-free clients, with an optional repo-root `.env` for `LOG_LEVEL`
+- HACS metadata, CI (pre-commit, hassfest, HACS, pytest), and changelog-driven release wiring

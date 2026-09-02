@@ -17,6 +17,7 @@ DEFAULT_ENVIRONMENT = "Live"
 HTTP_TIMEOUT = 30
 SIGNALR_RECORD_SEP = "\x1e"
 DASHBOARD_HUB = "MobileDashboardHub"
+MOBILE_HUB = "mobileHub"
 
 DEFAULT_RIDES_CUSTOMER_TYPE = "Municipality"
 CUSTOMER_TYPE_PATHS: dict[int, str] = {

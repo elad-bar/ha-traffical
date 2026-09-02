@@ -17,3 +17,7 @@ python engine/entrypoint.py --env Live
 ```
 
 Session file: `data/config.json` (repo root). Do not commit it.
+
+Optional logging: a repo-root `.env` is loaded at startup. `LOG_LEVEL` (a level name such as `DEBUG` or `INFO`, default `INFO`) is the only variable. Variables already set in the process are not overwritten. Do not commit `.env`.
+
+Install and env-var details: [README.md](../README.md#engine-cli).

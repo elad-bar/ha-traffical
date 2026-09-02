@@ -11,8 +11,8 @@ import sys
 import types
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_REPO = os.path.dirname(_HERE)
-_ROOT = os.path.join(_REPO, "custom_components", "traffical")
+REPO_ROOT = os.path.dirname(_HERE)
+_ROOT = os.path.join(REPO_ROOT, "custom_components", "traffical")
 
 if not (
     "traffical" in sys.modules and getattr(sys.modules["traffical"], "__path__", None)

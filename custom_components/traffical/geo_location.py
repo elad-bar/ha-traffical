@@ -12,7 +12,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .common.base_entity import TrafficalEntity
 from .common.consts import DOMAIN
 from .managers.coordinator import TrafficalCoordinator
-from .models.rides import is_your_station, station_id
+from .models.rides import Ride
+from .models.stations import Station
 
 PARALLEL_UPDATES = 1
 
@@ -30,13 +31,10 @@ async def async_setup_entry(
         for key, ride in (coordinator.data.get("rides") or {}).items():
             if not ride.get("assigned_today"):
                 continue
-            details = ride.get("details") or {}
-            for station in details.get("stations") or []:
-                if not isinstance(station, dict):
-                    continue
-                sid = station_id(station)
+            for station in Ride.from_cache(ride).stations:
+                sid = station.station_id
                 if sid:
-                    out.append((key, sid, station))
+                    out.append((key, sid, station.raw))
         return out
 
     def _sync() -> None:
@@ -80,58 +78,46 @@ class TrafficalStop(TrafficalEntity, GeolocationEvent):
         focus = (self.coordinator.data or {}).get("focus_ride_key")
         return bool(ride.get("assigned_today")) and self.ride_key == focus
 
-    def _station(self) -> dict[str, Any]:
+    def _station(self) -> Station:
         ride = self.coordinator.ride(self.ride_key or "")
-        details = ride.get("details") or {}
-        for station in details.get("stations") or []:
-            if isinstance(station, dict) and station_id(station) == self._stop_id:
+        for station in Ride.from_cache(ride).stations:
+            if station.station_id == self._stop_id:
                 return station
-        return {}
+        return Station({})
 
     @property
     def name(self) -> str | None:
-        station = self._station()
-        if station.get("isTarget"):
-            return str(station.get("name") or station.get("address") or self._stop_id)
-        return str(station.get("address") or station.get("name") or self._stop_id)
+        return self._station().label or self._stop_id
 
     @property
     def latitude(self) -> float | None:
-        try:
-            return float(self._station().get("lat"))
-        except (TypeError, ValueError):
-            return None
+        return self._station().lat
 
     @property
     def longitude(self) -> float | None:
-        try:
-            return float(self._station().get("lng"))
-        except (TypeError, ValueError):
-            return None
+        return self._station().lng
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        station = self._station()
         ride = self.coordinator.ride(self.ride_key or "")
-        info = (ride.get("list_row") or {}).get("rideInfo") or {}
-        member_id = self.coordinator.member_id()
-        home = is_your_station(
-            station, str(info.get("passengerStationName") or ""), member_id
+        station = self._station()
+        home = station.is_yours(
+            Ride.from_cache(ride).passenger_stop, self.coordinator.member_id()
         )
-        passed = self._stop_id in set(ride.get("passed_stations") or [])
-        if station.get("actualArriveDateTime"):
-            passed = True
+        passed = station.arrived or self._stop_id in set(
+            ride.get("passed_stations") or []
+        )
         kind = "pending"
         if home:
             kind = "home"
-        elif station.get("isTarget"):
+        elif station.is_target:
             kind = "target"
         elif passed:
             kind = "passed"
         return {
             "station_id": self._stop_id,
-            "name": station.get("name"),
-            "address": station.get("address"),
+            "name": station.name,
+            "address": station.address,
             "kind": kind,
             "passed": passed,
         }

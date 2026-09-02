@@ -5,7 +5,7 @@ Operators tuning Home Assistant should use the [README troubleshooting](../READM
 section; this doc defines **levels**, **message shape**, and **layering** so logs stay
 readable at `info` and actionable at `warning`.
 
-Logger parent: `custom_components.traffical`. Engine CLI may use `TRAFFICAL_LOG_LEVEL`.
+Logger parent: `custom_components.traffical`. Engine CLI may use `LOG_LEVEL` (process env or repo-root `.env`).
 
 ## Safety
 

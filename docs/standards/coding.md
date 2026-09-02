@@ -103,7 +103,7 @@ Shared contract for integration and engine. Named HA lines, flows, and `caplog` 
 
 **Home Assistant:** do not attach handlers. HA sets the level for `custom_components.traffical`.
 
-**Engine:** may configure logging in `entrypoint.py` (stdout, `TRAFFICAL_LOG_LEVEL` / `DEBUG=true`). Default INFO. Same client loggers, not a parallel `print` protocol.
+**Engine:** may configure logging in `entrypoint.py` (stdout, `LOG_LEVEL` only, including repo-root `.env` via `python-dotenv`). Default INFO. Do not add a second variable for the same knob. Same client loggers, not a parallel `print` protocol.
 
 ## HTTP and realtime
 

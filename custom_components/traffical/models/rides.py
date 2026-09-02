@@ -1,4 +1,4 @@
-"""Ride / station shapes (HA-free, no I/O)."""
+"""Ride shape (HA-free, no I/O)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from ..common.consts import (
     STATUS_LIVE,
 )
 from ..common.helpers import parse_utc
+from .stations import Station
 
 
 def rides_customer_type(customer_type_id: Any) -> str:
@@ -23,6 +24,7 @@ def rides_customer_type(customer_type_id: Any) -> str:
 
 
 def ride_device_key(route_id: Any, direction: Any) -> str | None:
+    """Stable device id for a recurring line, not the daily ``rideId``."""
     try:
         rid = int(route_id)
         direction_i = int(direction)
@@ -39,11 +41,109 @@ def status_finished(status: str) -> bool:
     return str(status or "").casefold() in STATUS_FINISHED
 
 
-def _ride_start(ride: dict[str, Any]) -> datetime | None:
-    details = ride.get("details") if isinstance(ride.get("details"), dict) else {}
-    row = ride.get("list_row") if isinstance(ride.get("list_row"), dict) else {}
-    info = row.get("rideInfo") if isinstance(row.get("rideInfo"), dict) else {}
-    return parse_utc(details.get("startTime") or info.get("startDateTime"))
+class Ride:
+    """One day's ride, built from a list row and optional details."""
+
+    def __init__(self, list_row: Any, details: Any = None) -> None:
+        self._row = list_row if isinstance(list_row, dict) else {}
+        self._details = details if isinstance(details, dict) else {}
+        info = self._row.get("rideInfo")
+        self._info = info if isinstance(info, dict) else {}
+
+    @classmethod
+    def from_cache(cls, record: Any) -> Ride:
+        """Rebuild from a coordinator / CLI cache entry."""
+        record = record if isinstance(record, dict) else {}
+        return cls(record.get("list_row"), record.get("details"))
+
+    @property
+    def ticket(self) -> str:
+        return str(self._info.get("rideTicket") or self._row.get("rideTicket") or "")
+
+    @property
+    def ride_id(self) -> int | None:
+        raw = self._info.get("rideId") or self._row.get("rideId")
+        if raw is None:
+            raw = self._details.get("rideId")
+        try:
+            return int(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def route_id(self) -> Any:
+        return (
+            self._details.get("routeId")
+            or self._info.get("routeId")
+            or self._row.get("routeId")
+        )
+
+    @property
+    def direction(self) -> Any:
+        return (
+            self._details.get("direction")
+            or self._info.get("direction")
+            or self._row.get("direction")
+        )
+
+    @property
+    def key(self) -> str | None:
+        return ride_device_key(self.route_id, self.direction)
+
+    @property
+    def name(self) -> str:
+        return str(
+            self._details.get("name")
+            or self._row.get("name")
+            or self._row.get("number")
+            or ""
+        )
+
+    @property
+    def status(self) -> str:
+        return str(self._details.get("status") or self._row.get("status") or "")
+
+    @property
+    def is_live(self) -> bool:
+        return status_live(self.status)
+
+    @property
+    def is_finished(self) -> bool:
+        return status_finished(self.status)
+
+    @property
+    def start(self) -> datetime | None:
+        return parse_utc(
+            self._details.get("startTime") or self._info.get("startDateTime")
+        )
+
+    @property
+    def end(self) -> datetime | None:
+        return parse_utc(self._details.get("endTime") or self._info.get("endDateTime"))
+
+    @property
+    def passenger_stop(self) -> str:
+        return str(self._info.get("passengerStationName") or "")
+
+    @property
+    def stations(self) -> list[Station]:
+        raw = self._details.get("stations")
+        if not isinstance(raw, list):
+            return []
+        return [Station(item) for item in raw if isinstance(item, dict)]
+
+    def your_station(self, member_id: int | None) -> Station | None:
+        stop = self.passenger_stop
+        for station in self.stations:
+            if station.is_yours(stop, member_id):
+                return station
+        return None
+
+    def target_station(self) -> Station | None:
+        for station in self.stations:
+            if station.is_target:
+                return station
+        return None
 
 
 def focus_ride_key(rides: dict[str, Any]) -> str | None:
@@ -65,77 +165,7 @@ def focus_ride_key(rides: dict[str, Any]) -> str | None:
     far = datetime(9999, 12, 31, tzinfo=timezone.utc)
 
     def _sort_start(item: tuple[str, dict[str, Any]]) -> datetime:
-        return _ride_start(item[1]) or far
+        return Ride.from_cache(item[1]).start or far
 
     upcoming.sort(key=_sort_start)
     return upcoming[0][0]
-
-
-def list_row_ids(row: dict[str, Any]) -> tuple[str, int | None]:
-    info = row.get("rideInfo") if isinstance(row.get("rideInfo"), dict) else {}
-    ticket = str(info.get("rideTicket") or row.get("rideTicket") or "")
-    ride_id_raw = info.get("rideId") or row.get("rideId")
-    try:
-        ride_id = int(ride_id_raw) if ride_id_raw is not None else None
-    except (TypeError, ValueError):
-        ride_id = None
-    return ticket, ride_id
-
-
-def list_row_route_key(
-    row: dict[str, Any], details: dict[str, Any] | None
-) -> str | None:
-    info = row.get("rideInfo") if isinstance(row.get("rideInfo"), dict) else {}
-    details = details if isinstance(details, dict) else {}
-    route_id = details.get("routeId") or info.get("routeId") or row.get("routeId")
-    direction = (
-        details.get("direction") or info.get("direction") or row.get("direction")
-    )
-    return ride_device_key(route_id, direction)
-
-
-def ride_name(row: dict[str, Any], details: dict[str, Any] | None) -> str:
-    details = details if isinstance(details, dict) else {}
-    return str(details.get("name") or row.get("name") or row.get("number") or "")
-
-
-def is_your_station(
-    station: dict[str, Any], passenger_stop: str, member_id: int | None
-) -> bool:
-    name = (station.get("name") or station.get("stationName") or "").strip()
-    if passenger_stop and name == passenger_stop.strip():
-        return True
-    if member_id is None:
-        return False
-    passengers = station.get("passengers") or []
-    if not isinstance(passengers, list):
-        return False
-    for passenger in passengers:
-        if not isinstance(passenger, dict):
-            continue
-        try:
-            if int(passenger.get("id")) == member_id:
-                return True
-        except (TypeError, ValueError):
-            continue
-    return False
-
-
-def station_id(station: dict[str, Any]) -> str | None:
-    raw = station.get("stationId") or station.get("id")
-    if raw is None:
-        return None
-    return str(raw)
-
-
-def coord_from_payload(payload: Any) -> tuple[float | None, float | None]:
-    if not isinstance(payload, dict):
-        return None, None
-    lat = payload.get("latitude") or payload.get("lat") or payload.get("Latitude")
-    lng = payload.get("longitude") or payload.get("lng") or payload.get("Longitude")
-    try:
-        lat_f = float(lat) if lat is not None else None
-        lng_f = float(lng) if lng is not None else None
-    except (TypeError, ValueError):
-        return None, None
-    return lat_f, lng_f

@@ -94,15 +94,56 @@ Availability, check-in policy windows, and station icons: [docs/home-assistant-i
 
 ## Engine CLI
 
-From the repo root (session in `data/config.json`):
+A terminal client that logs in and shows today's rides, stations, check-in state,
+and live bus position. It runs the same HA-free clients the integration uses, so
+it is the quickest way to verify an account or debug the API without Home Assistant.
+
+### Install
+
+Python 3.13 is what CI uses; 3.9+ works. From the repo root:
 
 ```bash
-python engine/entrypoint.py
-python engine/entrypoint.py --clean
-python engine/entrypoint.py --env Live
+python -m venv .venv
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+# macOS / Linux
+source .venv/bin/activate
+
+pip install -r requirements.txt
 ```
 
-Requires packages from [`requirements.txt`](requirements.txt).
+### Run
+
+```bash
+python engine/entrypoint.py             # resume session, or phone + OTP login
+python engine/entrypoint.py --clean     # forget the session and log in again
+python engine/entrypoint.py --env Live  # pick environment for a new session
+```
+
+First run asks for your phone number, then the OTP sent by SMS. The session
+(tokens, device id, chosen environment) is written to `data/config.json` at the
+repo root, so later runs skip the OTP until the refresh token dies. Neither that
+file nor `.env` should be committed.
+
+### Environment variables
+
+There is one, and it is optional. The CLI reads a repo-root `.env` on startup;
+a variable already set in your shell takes precedence over the file.
+
+| Variable    | Values                                          | Default | Effect                                                                                               |
+| ----------- | ----------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` | `INFO`  | Console verbosity. `DEBUG` adds HTTP paths, SignalR frames, and GPS positions; `INFO` is milestones. |
+
+```ini
+# .env
+LOG_LEVEL=DEBUG
+```
+
+Everything else (environment, phone, tokens) lives in the session file or comes
+from the `--env` / `--clean` flags, not from the environment.
+
+Live GPS positions are logged only at `DEBUG`, never at `INFO`. Do not paste
+`DEBUG` output into issues — it contains coordinates.
 
 ## Languages
 

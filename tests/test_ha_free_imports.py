@@ -13,7 +13,9 @@ _REPO = Path(__file__).resolve().parents[1]
 _ENGINE = _REPO / "engine"
 _HA_FREE_MODULES = (
     "traffical.models.exceptions",
+    "traffical.models.coordinates",
     "traffical.models.rides",
+    "traffical.models.stations",
     "traffical.managers.api_client",
     "traffical.managers.identity_client",
     "traffical.managers.mobile_client",

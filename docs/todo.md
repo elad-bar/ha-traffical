@@ -4,7 +4,7 @@ Bring this repo to the same **custom-component concept** as [ha-carlinko](https:
 
 Mark items `[x]` when done. Keep Phase A and Phase B as separate PRs.
 
-**Naming:** domain `traffical`, display **Traffical**, logger `custom_components.traffical`, env `TRAFFICAL_LOG_LEVEL`. GitHub: `elad-bar/ha-traffical` (confirm before wiring issue/docs URLs).
+**Naming:** domain `traffical`, display **Traffical**, logger `custom_components.traffical`, env `LOG_LEVEL`. GitHub: `elad-bar/ha-traffical` (confirm before wiring issue/docs URLs).
 
 **Keep as-is:** `docs/product-overview.md`, `docs/api-reference.md`, `docs/passenger-experience.md`, `docs/home-assistant-integration.md`. Do not copy Carlinko vehicle docs (`api-map.md`, `api-contracts.md`, `control-opcodes.md`) or Carlinko platform/blob Python.
 

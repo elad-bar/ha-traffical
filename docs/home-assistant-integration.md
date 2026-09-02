@@ -25,9 +25,10 @@ Out of scope for v1: driver GPS upload, route builder, join/QR, marketplace, inc
 
 ## Runtime model
 
-### Coordinator poll (HTTP)
+### Coordinator refresh (HTTP)
 
-Every **N minutes** (about 2–5). Faster (30–60s) when the next ride is within ~30 minutes of start.
+Every **N minutes** (about 2–5) for non-streamed data. Faster (30–60s) when
+the next ride is within ~30 minutes of start.
 
 Each tick:
 
@@ -38,6 +39,22 @@ Each tick:
 Respect mobile API rate limits (`X-Rate-Limit-Limit: 1s`). Do not poll every second.
 
 `button.traffical_refresh` only triggers this coordinator. It does not start GPS.
+
+### Ride status and route changes (SignalR)
+
+Keep a user-scoped `mobileHub` connection open for the config-entry session.
+It requires no subscription invoke:
+
+- `UpdateRideStatus` is a JSON string containing PascalCase `Id` and `Status`.
+  Patch only a ride already present in today's cache, then attach or detach live
+  GPS immediately.
+- `RouteSuccessfulSave` is a JSON string containing `ChangeDateFrom`,
+  `ChangeDateTo`, and `RouteId`. If its range includes today, debounce for about
+  five seconds and refresh the affected day's rides over HTTP.
+
+Reconnect `mobileHub` after a drop, token refresh, or child switch. It replaces
+the fast ride-list status poll; initial rides, check-in, details, and route-save
+follow-ups remain HTTP.
 
 ### Automatic live tracking (SignalR)
 
@@ -280,7 +297,8 @@ Parents with several children use `select.traffical_child` after a valid session
 | Rides + details + check-in statuses | `MobileClient.list_rides`, `ride_details`, `checkin_statuses` |
 | Path snapshot | `MobileClient.monitoring_path` |
 | Live GPS | `SignalRHubs.start_track` (`ReceiveCoordinates`, `ArrivedToStation`) |
-| Auto attach/detach GPS | `App._auto_track_tick` |
+| Stream ride status / route saves | `SignalRHubs.start_mobile` (`mobileHub`) |
+| Auto attach/detach GPS | `App._mobile_hub_event` |
 | Check-in / not coming POSTs | Documented; **not** wrapped on `MobileClient` yet |
 | `switch_child` | Identity grant; **not** in the console menu yet; new tokens must be saved on the entry |
 | Chat | Hub + settings; this Mashcal passenger tenant has no `rideChat` module (403) — omit until enabled |
@@ -292,6 +310,5 @@ Parents with several children use `select.traffical_child` after a valid session
 - Hugim reservations calendar (`/api/Mobile/Reservation/Municipality…`)
 - Join / shuttles (policy `joinRide` is off on this tenant)
 - Ride chat notify / send when `rideChat` is on
-- `mobileHub` `UpdateRideStatus` instead of relying only on HTTP poll
 - Notification inbox
 - QR check-in / join

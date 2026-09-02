@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from datetime import date, datetime, timedelta, timezone
 import logging
@@ -29,19 +30,16 @@ from ..common.consts import (
     POLL_INTERVAL_FAST,
 )
 from ..common.helpers import client_session, parse_utc, partial_id
+from ..models.coordinates import MonitoredPath, coord_from_payload
 from ..models.exceptions import ApiError, AuthError
 from ..models.rides import (
-    coord_from_payload,
+    Ride,
     focus_ride_key,
-    is_your_station,
-    list_row_ids,
-    list_row_route_key,
-    ride_name,
     rides_customer_type,
-    station_id,
     status_finished,
     status_live,
 )
+from ..models.stations import station_event_id
 from .identity_client import IdentityClient
 from .mobile_client import MobileClient
 from .signalr_client import SignalRHubs
@@ -90,6 +88,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._session = session
         self._reauth_started = False
         self._ride_listener: Callable[[], None] | None = None
+        self._route_refresh_task: asyncio.Task[None] | None = None
         self.data: dict[str, Any] = {
             "rides": {},
             "user": {},
@@ -133,10 +132,15 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_start(self) -> None:
         _LOGGER.info("coordinator starting")
         await self.async_config_entry_first_refresh()
+        await self.hubs.start_mobile(self._on_mobile_hub_event)
         self._register_devices()
 
     async def async_stop(self) -> None:
         _LOGGER.info("coordinator stopping")
+        if self._route_refresh_task is not None:
+            self._route_refresh_task.cancel()
+            self._route_refresh_task = None
+        await self.hubs.stop_mobile()
         await self.hubs.stop_track()
         await self._session.close()
 
@@ -172,6 +176,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.store.set_tokens(body)
         self._persist_entry()
         _LOGGER.info("Access token refreshed")
+        await self.hubs.restart()
         return True
 
     def _persist_entry(self) -> None:
@@ -235,7 +240,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             rides_raw = []
         ride_ids: list[int] = []
         for row in rides_raw:
-            _ticket, ride_id = list_row_ids(row)
+            ride_id = Ride(row).ride_id
             if ride_id is not None:
                 ride_ids.append(ride_id)
         statuses: dict[int, dict[str, Any]] = {}
@@ -255,22 +260,19 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ride["assigned_today"] = False
         live_key: str | None = None
         for row in rides_raw:
-            ticket, ride_id = list_row_ids(row)
+            ticket = Ride(row).ticket
             details: dict[str, Any] = {}
             if ticket:
                 loaded = await self.mobile.ride_details(ticket)
                 if isinstance(loaded, dict):
                     details = loaded
-                    if ride_id is None:
-                        try:
-                            ride_id = int(details.get("rideId"))
-                        except (TypeError, ValueError):
-                            ride_id = None
-            key = list_row_route_key(row, details)
+            ride = Ride(row, details)
+            key = ride.key
             if key is None:
                 continue
+            ride_id = ride.ride_id
             old = previous.get(key) or {}
-            status = str(details.get("status") or row.get("status") or "")
+            status = ride.status
             old_status = str(old.get("status") or "")
             check = statuses.get(ride_id) if ride_id is not None else None
             passed = set(old.get("passed_stations") or [])
@@ -278,11 +280,11 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             lng = old.get("lng")
             rides[key] = {
                 "key": key,
-                "route_id": details.get("routeId") or row.get("routeId"),
-                "direction": details.get("direction") or row.get("direction"),
+                "route_id": ride.route_id,
+                "direction": ride.direction,
                 "ride_id": ride_id,
                 "ticket": ticket,
-                "name": ride_name(row, details),
+                "name": ride.name,
                 "status": status,
                 "list_row": row,
                 "details": details,
@@ -342,21 +344,21 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     ) -> None:
         if not new_status or new_status == old_status:
             return
-        direction = details.get("direction") or row.get("direction")
+        ride = Ride(row, details)
         self.hass.bus.async_fire(
             EVENT_RIDE_STATUS_CHANGED,
             {
                 "ride_id": ride_id,
                 "old": old_status,
                 "new": new_status,
-                "direction": direction,
+                "direction": ride.direction,
                 "key": key,
             },
         )
         if status_live(new_status) and not status_live(old_status):
             self.hass.bus.async_fire(
                 EVENT_RIDE_STARTED,
-                {"ride_id": ride_id, "name": ride_name(row, details), "key": key},
+                {"ride_id": ride_id, "name": ride.name, "key": key},
             )
         if status_finished(new_status) and not status_finished(old_status):
             self.hass.bus.async_fire(
@@ -385,12 +387,8 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for ride in rides.values():
             if not ride.get("assigned_today"):
                 continue
-            details = ride.get("details") or {}
-            info = (ride.get("list_row") or {}).get("rideInfo") or {}
-            start = parse_utc(details.get("startTime") or info.get("startDateTime"))
+            start = Ride.from_cache(ride).start
             if start and timedelta(0) <= (start - now) <= FAST_WINDOW:
-                fast = True
-            if status_live(str(ride.get("status") or "")):
                 fast = True
         wanted = POLL_INTERVAL_FAST if fast else POLL_INTERVAL
         option = self.entry.options.get(CONF_POLL_INTERVAL)
@@ -412,25 +410,115 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         if self.hubs.track_ride_id == ride_id:
             return
+        # Seed once before attaching; subsequent positions come from SignalR.
         try:
             path = await self.mobile.monitoring_path(int(ride_id))
-        except ApiError:
+        except ApiError as exc:
+            _LOGGER.warning(f"monitoring path failed ride={partial_id(ride_id)}: {exc}")
             path = []
-        self._seed_path(live_key, path)
+        moved = self._seed_path(live_key, path)
+        _LOGGER.debug(
+            f"position seed ride={partial_id(ride_id)} "
+            f"points={len(MonitoredPath(path).points)} changed={moved}"
+        )
         _LOGGER.debug(f"Monitor invoke rideId={ride_id}")
         await self.hubs.start_track(int(ride_id), self._on_hub_event)
         _LOGGER.info(f"SignalR connected rideId={ride_id}")
 
-    def _seed_path(self, key: str, path: Any) -> None:
-        points = path if isinstance(path, list) else [path] if path else []
-        if not points:
+    async def _on_mobile_hub_event(self, event: str, payload: Any) -> None:
+        if event == "UpdateRideStatus":
+            await self._apply_streamed_status(payload)
             return
-        last = points[-1]
+        if event == "RouteSuccessfulSave":
+            self._schedule_route_refresh(payload)
+
+    async def _apply_streamed_status(self, payload: Any) -> None:
+        if not isinstance(payload, dict):
+            return
+        ride_id_raw = payload.get("Id")
+        status_raw = payload.get("Status")
+        try:
+            ride_id = int(ride_id_raw)
+        except (TypeError, ValueError):
+            return
+        if not isinstance(status_raw, str) or not status_raw:
+            return
+        rides = self.data.get("rides") or {}
+        match: tuple[str, dict[str, Any]] | None = None
+        for key, ride in rides.items():
+            if ride.get("assigned_today") and ride.get("ride_id") == ride_id:
+                match = key, ride
+                break
+        if match is None:
+            _LOGGER.debug(
+                f"status push ignored ride={partial_id(ride_id)} reason=not_cached"
+            )
+            return
+        key, ride = match
+        old_status = str(ride.get("status") or "")
+        if old_status == status_raw:
+            return
+        ride["status"] = status_raw
+        row = ride.get("list_row") or {}
+        details = ride.get("details") or {}
+        row["status"] = status_raw
+        details["status"] = status_raw
+        self._emit_status(key, old_status, status_raw, ride_id, details, row)
+        live_key = next(
+            (
+                candidate_key
+                for candidate_key, candidate in rides.items()
+                if candidate.get("assigned_today")
+                and status_live(str(candidate.get("status") or ""))
+            ),
+            None,
+        )
+        self.data["live_key"] = live_key
+        self.data["focus_ride_key"] = focus_ride_key(rides)
+        await self._sync_signalr(live_key, rides)
+        self.async_set_updated_data(self.data)
+
+    def _schedule_route_refresh(self, payload: Any) -> None:
+        if not isinstance(payload, dict) or not self._route_change_includes_today(
+            payload
+        ):
+            return
+        if self._route_refresh_task is not None:
+            self._route_refresh_task.cancel()
+        self._route_refresh_task = asyncio.create_task(
+            self._debounced_route_refresh(), name="traffical-route-refresh"
+        )
+
+    @staticmethod
+    def _route_change_includes_today(payload: dict[str, Any]) -> bool:
+        start = parse_utc(payload.get("ChangeDateFrom"))
+        end = parse_utc(payload.get("ChangeDateTo"))
+        today = date.today()
+        return bool(start and end and start.date() <= today <= end.date())
+
+    async def _debounced_route_refresh(self) -> None:
+        try:
+            await asyncio.sleep(5)
+            await self.async_request_refresh()
+        except asyncio.CancelledError:
+            raise
+        finally:
+            if self._route_refresh_task is asyncio.current_task():
+                self._route_refresh_task = None
+
+    def _seed_path(self, key: str, path: Any) -> bool:
+        last = MonitoredPath(path).latest
+        if last is None:
+            return False
         lat, lng = coord_from_payload(last)
         ride = (self.data.get("rides") or {}).get(key)
-        if ride is not None and lat is not None:
-            ride["lat"] = lat
-            ride["lng"] = lng
+        if ride is None or lat is None:
+            return False
+        if ride.get("lat") == lat and ride.get("lng") == lng:
+            return False
+        ride["lat"] = lat
+        ride["lng"] = lng
+        return True
 
     async def _on_hub_event(self, event: str, payload: Any) -> None:
         live_key = (self.data or {}).get("live_key")
@@ -441,7 +529,10 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if ride is None:
             return
         if event == "ReceiveCoordinates":
-            lat, lng = coord_from_payload(payload)
+            latest = MonitoredPath(payload).latest
+            if latest is None:
+                return
+            lat, lng = coord_from_payload(latest)
             if lat is not None:
                 ride["lat"] = lat
                 ride["lng"] = lng
@@ -449,25 +540,17 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.async_set_updated_data(self.data)
             return
         if event == "ArrivedToStation":
-            sid = None
-            if isinstance(payload, dict):
-                sid = payload.get("stationId")
-            else:
-                sid = payload
+            sid = station_event_id(payload)
             if sid is not None:
                 passed = set(ride.get("passed_stations") or [])
-                passed.add(str(sid))
+                passed.add(sid)
                 ride["passed_stations"] = passed
             member_id = self.member_id()
-            details = ride.get("details") or {}
-            info = (ride.get("list_row") or {}).get("rideInfo") or {}
-            stop = str(info.get("passengerStationName") or "")
+            cached = Ride.from_cache(ride)
             is_mine = False
-            for station in details.get("stations") or []:
-                if not isinstance(station, dict):
-                    continue
-                if str(station_id(station) or "") == str(sid) and is_your_station(
-                    station, stop, member_id
+            for station in cached.stations:
+                if str(station.station_id or "") == str(sid) and station.is_yours(
+                    cached.passenger_stop, member_id
                 ):
                     is_mine = True
                     break
@@ -506,20 +589,10 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
     def _home_station(self, ride: dict[str, Any]) -> tuple[float, float] | None:
-        details = ride.get("details") or {}
-        info = (ride.get("list_row") or {}).get("rideInfo") or {}
-        stop = str(info.get("passengerStationName") or "")
-        member_id = self.member_id()
-        for station in details.get("stations") or []:
-            if not isinstance(station, dict):
-                continue
-            if not is_your_station(station, stop, member_id):
-                continue
-            try:
-                return float(station.get("lat")), float(station.get("lng"))
-            except (TypeError, ValueError):
-                return None
-        return None
+        station = Ride.from_cache(ride).your_station(self.member_id())
+        if station is None or station.lat is None or station.lng is None:
+            return None
+        return station.lat, station.lng
 
     def _register_devices(self) -> None:
         registry = dr.async_get(self.hass)
@@ -577,6 +650,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.store.set_tokens(body)
         self.store.data["child_id"] = child_id
         self._persist_entry()
+        await self.hubs.restart()
         await self.async_request_refresh()
 
     async def async_check_in(self, key: str, check_in: bool) -> None:

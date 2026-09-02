@@ -120,7 +120,15 @@ async def test_coordinator_ride_key_not_daily_id(hass: HomeAssistant) -> None:
             new_callable=AsyncMock,
         ),
         patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.start_mobile",
+            new_callable=AsyncMock,
+        ),
+        patch(
             "custom_components.traffical.managers.signalr_client.SignalRHubs.stop_track",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.stop_mobile",
             new_callable=AsyncMock,
         ),
     ):
@@ -134,5 +142,77 @@ async def test_coordinator_ride_key_not_daily_id(hass: HomeAssistant) -> None:
             assert ride["assigned_today"] is True
             assert coordinator.policy_active("gotOnRideReport")
             assert coordinator.data["focus_ride_key"] == key
+        finally:
+            await coordinator.async_stop()
+
+
+@pytest.mark.asyncio
+async def test_mobile_hub_status_starts_live_tracking(hass: HomeAssistant) -> None:
+    entry = _entry()
+    entry.add_to_hass(hass)
+    with (
+        patch(
+            "custom_components.traffical.managers.identity_client.IdentityClient.userinfo",
+            new_callable=AsyncMock,
+            return_value=_USER,
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.user_roles",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.passenger_policies",
+            new_callable=AsyncMock,
+            return_value={},
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.list_rides",
+            new_callable=AsyncMock,
+            return_value=[_RIDE],
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.checkin_statuses",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.ride_details",
+            new_callable=AsyncMock,
+            return_value=_DETAILS,
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.monitoring_path",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.start_mobile",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.stop_mobile",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.start_track",
+            new_callable=AsyncMock,
+        ) as start_track,
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.stop_track",
+            new_callable=AsyncMock,
+        ),
+    ):
+        coordinator = await async_create_coordinator(hass, entry)
+        await coordinator.async_start()
+        try:
+            await coordinator._on_mobile_hub_event(
+                "UpdateRideStatus",
+                {"Id": 39306112, "Status": "OngoingMonitored"},
+            )
+            key = ride_device_key(392681, 120)
+            assert coordinator.ride(key)["status"] == "OngoingMonitored"
+            assert coordinator.data["live_key"] == key
+            start_track.assert_awaited_once()
         finally:
             await coordinator.async_stop()
