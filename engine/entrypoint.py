@@ -11,7 +11,6 @@ Usage:
   python engine/entrypoint.py
   python -m engine.entrypoint
   python engine/entrypoint.py --clean
-  python engine/entrypoint.py --env Live
 """
 
 from __future__ import annotations
@@ -34,8 +33,6 @@ except ImportError:  # run as a script, not as ``python -m engine.entrypoint``
 
 from traffical.common.consts import (
     CONFIG_PATH,
-    DEFAULT_ENVIRONMENT,
-    ENVIRONMENTS,
     FAST_WINDOW,
     POLL_INTERVAL,
     POLL_INTERVAL_FAST,
@@ -146,7 +143,7 @@ class App:
         self.mobile.on_unauthorized = self._try_refresh
         self.identity.on_unauthorized = self._try_refresh
 
-    async def run(self, clean: bool = False, env: str | None = None) -> int:
+    async def run(self, clean: bool = False) -> int:
         if clean:
             if self.store.clear():
                 _LOGGER.info(f"Removed session file {CONFIG_PATH}")
@@ -155,12 +152,8 @@ class App:
 
         self.store.load()
         if not self.store.identity_url:
-            self.store.apply_environment(env or DEFAULT_ENVIRONMENT)
+            self.store.apply_live_hosts()
             self.store.save()
-        elif env and env != self.store.environment:
-            _LOGGER.warning(
-                f"Saved session is {self.store.environment}. Use --clean to switch to {env}."
-            )
 
         self.identity.base_url = self.store.identity_url.rstrip("/")
         self.identity.language = self.store.language
@@ -756,11 +749,6 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Delete data/config.json and start from the phone prompt",
     )
-    parser.add_argument(
-        "--env",
-        choices=list(ENVIRONMENTS),
-        help="Environment for a new session (default: Live). Ignored if a session already exists unless --clean.",
-    )
     return parser.parse_args()
 
 
@@ -782,9 +770,7 @@ async def async_main() -> int:
             tokens_provider=lambda: store.tokens,
         )
         hubs = SignalRHubs(session, "", lambda: store.tokens)
-        return await App(store, identity, mobile, hubs).run(
-            clean=args.clean, env=args.env
-        )
+        return await App(store, identity, mobile, hubs).run(clean=args.clean)
     finally:
         await session.close()
 

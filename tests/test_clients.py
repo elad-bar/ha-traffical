@@ -287,7 +287,7 @@ def test_ride_from_cache_round_trips() -> None:
 
 def test_store_tokens(tmp_path) -> None:
     store = SessionStore(tmp_path / "config.json")
-    store.apply_environment("Live")
+    store.apply_live_hosts()
     store.set_tokens({"access_token": "a", "refresh_token": "r", "expires_in": 60})
     store.save()
     other = SessionStore(tmp_path / "config.json")

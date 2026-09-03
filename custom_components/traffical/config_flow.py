@@ -14,11 +14,8 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
 from .common.consts import (
-    CONF_ENVIRONMENT,
     CONF_POLL_INTERVAL,
-    DEFAULT_ENVIRONMENT,
     DOMAIN,
-    ENVIRONMENTS,
 )
 from .common.helpers import client_session, create_pkce, mask_phone
 from .managers.identity_client import IdentityClient
@@ -30,15 +27,8 @@ _LOGGER = logging.getLogger(__name__)
 
 def _user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     defaults = defaults or {}
-    env = defaults.get(CONF_ENVIRONMENT) or DEFAULT_ENVIRONMENT
     return vol.Schema(
         {
-            vol.Required(CONF_ENVIRONMENT, default=env): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=list(ENVIRONMENTS),
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                )
-            ),
             vol.Required(
                 "phone", default=defaults.get("phone", "")
             ): selector.TextSelector(),
@@ -69,19 +59,11 @@ class TrafficalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_show_form(step_id="user", data_schema=_user_schema())
 
         phone = str(user_input["phone"]).strip()
-        env = str(user_input[CONF_ENVIRONMENT]).strip()
-        if env not in ENVIRONMENTS:
-            errors["base"] = "unknown"
-            return self.async_show_form(
-                step_id="user", data_schema=_user_schema(user_input), errors=errors
-            )
-        self._store.apply_environment(env)
+        self._store.apply_live_hosts()
         self._store.phone = phone
         if not self._store.device_id:
             self._store.data["device_id"] = str(uuid.uuid4())
-        _LOGGER.info(
-            f"config flow submit step=user env={env} phone={mask_phone(phone)}"
-        )
+        _LOGGER.info(f"config flow submit step=user env=Live phone={mask_phone(phone)}")
         try:
             await self._request_otp()
         except AuthError:

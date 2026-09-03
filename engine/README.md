@@ -13,7 +13,6 @@ Home Assistant is the product. This folder is a thin asyncio CLI that mounts the
 ```text
 python engine/entrypoint.py
 python engine/entrypoint.py --clean
-python engine/entrypoint.py --env Live
 ```
 
 Session file: `data/config.json` (repo root). Do not commit it.

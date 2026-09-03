@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 import uuid
 
-from ..common.consts import CONFIG_PATH, DEFAULT_LANGUAGE, ENVIRONMENTS
+from ..common.consts import API_URL, CONFIG_PATH, DEFAULT_LANGUAGE, IDENTITY_URL
 from ..common.helpers import now_iso
 
 
@@ -40,11 +40,10 @@ class SessionStore:
             return True
         return False
 
-    def apply_environment(self, env_name: str) -> None:
-        env = ENVIRONMENTS[env_name]
-        self.data["environment"] = env_name
-        self.data["api_url"] = env["api_url"]
-        self.data["identity_url"] = env["identity_url"]
+    def apply_live_hosts(self) -> None:
+        self.data["environment"] = "Live"
+        self.data["api_url"] = API_URL
+        self.data["identity_url"] = IDENTITY_URL
         self.data.setdefault("language", DEFAULT_LANGUAGE)
         self.data.setdefault("app_hash", "")
         if not self.data.get("device_id"):

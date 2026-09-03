@@ -118,13 +118,12 @@ pip install -r requirements.txt
 ```bash
 python engine/entrypoint.py             # resume session, or phone + OTP login
 python engine/entrypoint.py --clean     # forget the session and log in again
-python engine/entrypoint.py --env Live  # pick environment for a new session
 ```
 
 First run asks for your phone number, then the OTP sent by SMS. After login the
 CLI prints today’s rides (and the next unfinished day if today is done) once, then listens for HTTP polls and SignalR
-(Ctrl+C to exit). There is no ride menu. The session (tokens, device id, chosen
-environment) is written to `data/config.json` at the repo root, so later runs skip
+(Ctrl+C to exit). There is no ride menu. The session (tokens, device id, Live hosts)
+is written to `data/config.json` at the repo root, so later runs skip
 the OTP until the refresh token dies. Neither that file nor `.env` should be committed.
 
 ### Environment variables
@@ -141,8 +140,8 @@ a variable already set in your shell takes precedence over the file.
 LOG_LEVEL=DEBUG
 ```
 
-Everything else (environment, phone, tokens) lives in the session file or comes
-from the `--env` / `--clean` flags, not from the environment.
+Everything else (phone, tokens) lives in the session file or comes
+from the `--clean` flag, not from the environment.
 
 Live GPS positions are logged only at `DEBUG`, never at `INFO`. Do not paste
 `DEBUG` output into issues — it contains coordinates.

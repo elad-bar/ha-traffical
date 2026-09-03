@@ -8,8 +8,9 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.traffical.common.consts import (
-    CONF_ENVIRONMENT,
+    API_URL,
     DOMAIN,
+    IDENTITY_URL,
 )
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -52,7 +53,7 @@ async def test_config_flow_user_success(hass: HomeAssistant) -> None:
         assert result["type"] == FlowResultType.FORM
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {CONF_ENVIRONMENT: "Live", "phone": "0501234567"},
+            {"phone": "0501234567"},
         )
         assert result2["type"] == FlowResultType.FORM
         assert result2["step_id"] == "otp"
@@ -64,6 +65,9 @@ async def test_config_flow_user_success(hass: HomeAssistant) -> None:
     assert result3["type"] == FlowResultType.CREATE_ENTRY
     assert result3["result"].unique_id == "user-sub-1"
     assert result3["data"]["phone"] == "0501234567"
+    assert result3["data"]["environment"] == "Live"
+    assert result3["data"]["api_url"] == API_URL
+    assert result3["data"]["identity_url"] == IDENTITY_URL
 
 
 @pytest.mark.asyncio
@@ -72,7 +76,7 @@ async def test_config_flow_reauth(hass: HomeAssistant) -> None:
         domain=DOMAIN,
         unique_id="user-sub-1",
         data={
-            CONF_ENVIRONMENT: "Live",
+            "environment": "Live",
             "phone": "0501234567",
             "api_url": "https://mobile-traffical.mashcal.co.il/",
             "identity_url": "https://identity-traffical.mashcal.co.il/",

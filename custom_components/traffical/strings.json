@@ -5,7 +5,6 @@
         "title": "Traffical",
         "description": "Sign in with the phone number used in the Traffical app.",
         "data": {
-          "environment": "Environment",
           "phone": "Phone"
         }
       },

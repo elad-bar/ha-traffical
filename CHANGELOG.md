@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.3] - 2026-09-03
+
+### Changed
+
+- Home Assistant setup always uses Live hosts; environment is no longer a config-flow field
+- Engine CLI always uses Live hosts (no `--env`); same hosts as Home Assistant
+
 ## [0.1.2] - 2026-09-03
 
 ### Fixed

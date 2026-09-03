@@ -281,7 +281,7 @@ While reauth is pending, the integration is unavailable (buttons, bus tracker, c
 
 | Step | First setup | Reauth |
 |------|-------------|--------|
-| Phone + environment | User enters phone | Skipped; phone from `entry.data` |
+| Phone | User enters phone (Live hosts) | Skipped; phone from `entry.data` |
 | Send OTP | After submit of phone step | **Immediately** when the user opens reauth |
 | Enter OTP | `async_step_otp` | `async_step_reauth_confirm` |
 | Unique id | e.g. `phone` or userinfo `sub` | Same entry (`async_set_unique_id`) |

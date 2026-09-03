@@ -9,7 +9,6 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.traffical.common.consts import (
-    CONF_ENVIRONMENT,
     CONF_PHONE,
     CONF_POLL_INTERVAL,
     CONF_TOKENS,
@@ -53,7 +52,7 @@ def _mock_entry_and_coordinator():
         unique_id="user-sub-1",
         data={
             CONF_PHONE: "0501234567",
-            CONF_ENVIRONMENT: "Live",
+            "environment": "Live",
             CONF_TOKENS: {
                 "access_token": "tokensecret",
                 "refresh_token": "refreshsecret",

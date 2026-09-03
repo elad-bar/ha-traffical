@@ -13,7 +13,6 @@ OAUTH_SCOPE = "openid shift_mobile_api offline_access"
 OTP_TICKET_HEADER = "x-otp-ticket"
 
 DEFAULT_LANGUAGE = "he"
-DEFAULT_ENVIRONMENT = "Live"
 HTTP_TIMEOUT = 30
 SIGNALR_RECORD_SEP = "\x1e"
 DASHBOARD_HUB = "MobileDashboardHub"
@@ -31,31 +30,10 @@ CUSTOMER_TYPE_PATHS: dict[int, str] = {
     266: "Generic",
 }
 
-ENVIRONMENTS: dict[str, dict[str, str]] = {
-    "Live": {
-        "api_url": "https://mobile-traffical.mashcal.co.il/",
-        "identity_url": "https://identity-traffical.mashcal.co.il/",
-    },
-    "QA": {
-        "api_url": "https://mobile-traffical-qa.mashcal.co.il/",
-        "identity_url": "https://identity-traffical-qa.mashcal.co.il/",
-    },
-    "Dev": {
-        "api_url": "https://dev-mobile.shiftpro.co/",
-        "identity_url": "https://id-dev.shiftlive.net/",
-    },
-    "Stage": {
-        "api_url": "https://stage-mobile.shiftlive.net/",
-        "identity_url": "https://id-stage.shiftlive.net/",
-    },
-    "PreProd": {
-        "api_url": "https://preprod-mobile.shiftpro.co/",
-        "identity_url": "https://id-preprod.shiftlive.net/",
-    },
-}
+API_URL = "https://mobile-traffical.mashcal.co.il/"
+IDENTITY_URL = "https://identity-traffical.mashcal.co.il/"
 
 CONF_PHONE = "phone"
-CONF_ENVIRONMENT = "environment"
 CONF_API_URL = "api_url"
 CONF_IDENTITY_URL = "identity_url"
 CONF_LANGUAGE = "language"

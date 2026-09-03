@@ -5,7 +5,6 @@
         "title": "Traffical",
         "description": "התחברו עם מספר הטלפון שבו משתמשים באפליקציית Traffical.",
         "data": {
-          "environment": "סביבה",
           "phone": "טלפון"
         }
       },
