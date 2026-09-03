@@ -31,6 +31,8 @@ from ..common.consts import (
 )
 from ..common.helpers import client_session, parse_utc, partial_id
 from ..models.coordinates import MonitoredPath, coord_from_payload
+from ..models.entity_specs import policy_active
+from ..models.entity_values import EntityContext
 from ..models.exceptions import ApiError, AuthError
 from ..models.ride_window import RideWindow
 from ..models.rides import (
@@ -77,6 +79,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=DOMAIN,
             update_interval=update_interval,
         )
@@ -87,7 +90,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.hubs = hubs
         self._session = session
         self._reauth_started = False
-        self._ride_listener: Callable[[], None] | None = None
+        self._entity_listeners: list[Callable[[], None]] = []
         self._route_refresh_task: asyncio.Task[None] | None = None
         self.window = RideWindow()
         self.data: dict[str, Any] = {
@@ -128,11 +131,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return None
 
     def policy_active(self, group: str) -> bool:
-        policies = self.data.get("policies") or {}
-        block = policies.get(group) or {}
-        if isinstance(block, dict):
-            return bool(block.get("isActive"))
-        return False
+        return policy_active(self.data.get("policies"), group)
 
     async def async_start(self) -> None:
         _LOGGER.info("coordinator starting")
@@ -152,17 +151,45 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def register_entity_listener(
         self, listener: Callable[[], None]
     ) -> Callable[[], None]:
-        self._ride_listener = listener
+        """Subscribe a platform to structural (ride / station) changes."""
+        self._entity_listeners.append(listener)
 
         def _unsub() -> None:
-            if self._ride_listener == listener:
-                self._ride_listener = None
+            if listener in self._entity_listeners:
+                self._entity_listeners.remove(listener)
 
         return _unsub
 
     def _notify_entities(self) -> None:
-        if self._ride_listener is not None:
-            self._ride_listener()
+        for listener in list(self._entity_listeners):
+            listener()
+
+    @callback
+    def entity_context(self) -> EntityContext:
+        """Account-level snapshot every entity resolves against."""
+        data = self.data or {}
+        person = (self.store.user or {}).get("person") or {}
+        name = " ".join(
+            part for part in (person.get("firstName"), person.get("lastName")) if part
+        )
+        return EntityContext(
+            member_id=self.member_id(),
+            session_ok=bool(data.get("session_ok")),
+            children=tuple(data.get("children") or ()),
+            policies=data.get("policies") or {},
+            focus=data.get("focus"),
+            focus_ride_key=data.get("focus_ride_key"),
+            passenger_name=name,
+        )
+
+    @callback
+    def entity_caps(self) -> dict[str, Any]:
+        """Tenant capabilities that gate which entities exist at all."""
+        data = self.data or {}
+        return {
+            "policies": data.get("policies") or {},
+            "children": tuple(data.get("children") or ()),
+        }
 
     async def _on_unauthorized(self) -> bool:
         return await self._refresh_tokens()
@@ -672,6 +699,22 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._persist_entry()
         await self.hubs.restart()
         await self.async_request_refresh()
+
+    async def async_action(self, action: str, ride_key: str | None = None) -> None:
+        """Run a named catalog action (button presses)."""
+        handlers: dict[str, Callable[[], Any]] = {
+            "refresh": self.async_request_refresh,
+            "check_in": lambda: self.async_check_in(str(ride_key), True),
+            "check_out": lambda: self.async_check_in(str(ride_key), False),
+            "not_coming": lambda: self.async_not_coming(str(ride_key)),
+        }
+        handler = handlers.get(action)
+        if handler is None:
+            _LOGGER.warning(f"unknown action {action}")
+            return
+        if action != "refresh" and ride_key is None:
+            return
+        await handler()
 
     async def async_check_in(self, key: str, check_in: bool) -> None:
         ride = self.ride(key)

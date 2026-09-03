@@ -18,4 +18,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Hebrew (`he`) Home Assistant UI translations for the config flow, entities, and device triggers
 - Engine CLI (`engine/entrypoint.py`) sharing the integration's HA-free clients, with an optional repo-root `.env` for `LOG_LEVEL`; after login it dumps loaded rides once and listens for polls and SignalR (no ride menu)
 - Ride lookahead: today is listed while trips remain, then at most four days forward until the next unfinished ride, which is then cached. The **Next ride** sensor can point at that later day, while each line device keeps today's finished `rideId` — and the map pins — until the date rolls
-- HACS metadata, CI (pre-commit, hassfest, HACS, pytest), and changelog-driven release wiring
+- HACS metadata including brand assets, CI (pre-commit, hassfest, HACS, pytest), and changelog-driven release wiring

@@ -9,11 +9,15 @@ import sys
 
 import pytest
 
+from custom_components.traffical.common.consts import PLATFORMS
+
 _REPO = Path(__file__).resolve().parents[1]
 _ENGINE = _REPO / "engine"
 _HA_FREE_MODULES = (
     "traffical.models.exceptions",
     "traffical.models.coordinates",
+    "traffical.models.entity_specs",
+    "traffical.models.entity_values",
     "traffical.models.ride_window",
     "traffical.models.rides",
     "traffical.models.stations",
@@ -56,12 +60,20 @@ def test_ha_free_modules_import_without_homeassistant() -> None:
 
 
 def test_platforms_use_common_entity_setup() -> None:
-    platforms = ("sensor", "binary_sensor", "button", "device_tracker")
     root = _REPO / "custom_components" / "traffical"
-    for name in platforms:
+    for name in PLATFORMS:
         text = (root / f"{name}.py").read_text(encoding="utf-8")
         assert "from .common.entity_setup import async_setup_entities" in text
         assert "async_setup_entities(" in text
+
+
+def test_platforms_hold_no_per_entity_branching() -> None:
+    """Per-key logic belongs in the catalog, not in the platform files."""
+    root = _REPO / "custom_components" / "traffical"
+    for name in PLATFORMS:
+        text = (root / f"{name}.py").read_text(encoding="utf-8")
+        assert "entity_key" not in text, name
+        assert not re.search(r"spec\.key\s*==", text), name
 
 
 @pytest.mark.parametrize("mod_name", _HA_FREE_MODULES)

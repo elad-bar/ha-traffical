@@ -44,8 +44,7 @@ class RideWindow:
         """Today through today plus the lookahead cap."""
         start = self.today if self.today is not None else date.today()
         return [
-            start + timedelta(days=offset)
-            for offset in range(self.lookahead_days + 1)
+            start + timedelta(days=offset) for offset in range(self.lookahead_days + 1)
         ]
 
     def overlapping_dates(
@@ -89,9 +88,7 @@ class RideWindow:
     ) -> None:
         """Replace one service date with freshly listed ``(row, details, checkin)``."""
         kept = [
-            occ
-            for occ in self.occurrences
-            if self._service_date(occ) != service_date
+            occ for occ in self.occurrences if self._service_date(occ) != service_date
         ]
         listed: list[dict[str, Any]] = []
         for list_row, details, checkin in entries:
@@ -105,9 +102,7 @@ class RideWindow:
     def focus(self) -> dict[str, Any] | None:
         """Live occurrence, else the earliest unfinished one by date and start."""
         live = [
-            occ
-            for occ in self.occurrences
-            if status_live(str(occ.get("status") or ""))
+            occ for occ in self.occurrences if status_live(str(occ.get("status") or ""))
         ]
         if live:
             return min(live, key=self._sort_key)
@@ -123,7 +118,9 @@ class RideWindow:
     @property
     def live_key(self) -> str | None:
         for key, ride in self.rides.items():
-            if ride.get("assigned_today") and status_live(str(ride.get("status") or "")):
+            if ride.get("assigned_today") and status_live(
+                str(ride.get("status") or "")
+            ):
                 return key
         return None
 
@@ -159,9 +156,7 @@ class RideWindow:
                 return key, ride
         return None
 
-    def apply_status(
-        self, ride_id: int, status: str
-    ) -> tuple[str | None, str] | None:
+    def apply_status(self, ride_id: int, status: str) -> tuple[str | None, str] | None:
         """Patch a streamed status. Returns ``(bound key, previous status)``."""
         occ = self.occurrence_for(ride_id)
         bound = self.bound_for(ride_id)
@@ -188,9 +183,7 @@ class RideWindow:
         self, previous: dict[str, Any] | None, line: list[dict[str, Any]]
     ) -> dict[str, Any] | None:
         today_iso = self.today_iso
-        today_rows = [
-            occ for occ in line if self._service_date(occ) == today_iso
-        ]
+        today_rows = [occ for occ in line if self._service_date(occ) == today_iso]
         if not today_rows:
             return None
         unfinished = [

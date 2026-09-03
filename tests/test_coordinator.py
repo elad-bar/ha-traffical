@@ -11,6 +11,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.traffical.common.consts import DOMAIN
 from custom_components.traffical.managers.coordinator import async_create_coordinator
 from custom_components.traffical.models.rides import ride_device_key
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 
 _USER = {
@@ -60,8 +61,9 @@ _DETAILS = {
 }
 
 
-def _entry() -> MockConfigEntry:
-    return MockConfigEntry(
+def _entry(hass: HomeAssistant) -> MockConfigEntry:
+    """Register an entry mid-setup, as HA does before starting a coordinator."""
+    entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="user-sub-1",
         data={
@@ -79,12 +81,14 @@ def _entry() -> MockConfigEntry:
             },
         },
     )
+    entry.add_to_hass(hass)
+    entry.mock_state(hass, ConfigEntryState.SETUP_IN_PROGRESS)
+    return entry
 
 
 @pytest.mark.asyncio
 async def test_coordinator_ride_key_not_daily_id(hass: HomeAssistant) -> None:
-    entry = _entry()
-    entry.add_to_hass(hass)
+    entry = _entry(hass)
     with (
         patch(
             "custom_components.traffical.managers.identity_client.IdentityClient.userinfo",
@@ -153,8 +157,7 @@ async def test_coordinator_ride_key_not_daily_id(hass: HomeAssistant) -> None:
 
 @pytest.mark.asyncio
 async def test_mobile_hub_status_starts_live_tracking(hass: HomeAssistant) -> None:
-    entry = _entry()
-    entry.add_to_hass(hass)
+    entry = _entry(hass)
     with (
         patch(
             "custom_components.traffical.managers.identity_client.IdentityClient.userinfo",
@@ -288,8 +291,7 @@ async def _details_by_ticket(ticket: str):
 async def test_coordinator_keeps_finished_today_focus_tomorrow(
     hass: HomeAssistant,
 ) -> None:
-    entry = _entry()
-    entry.add_to_hass(hass)
+    entry = _entry(hass)
     with (
         patch(
             "custom_components.traffical.managers.identity_client.IdentityClient.userinfo",

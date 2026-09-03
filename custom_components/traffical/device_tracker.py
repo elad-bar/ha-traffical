@@ -10,7 +10,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .common.base_entity import TrafficalEntity
 from .common.entity_setup import async_setup_entities
 from .managers.coordinator import TrafficalCoordinator
-from .models.rides import status_live
 
 PARALLEL_UPDATES = 1
 
@@ -25,9 +24,8 @@ async def async_setup_entry(
         hass,
         entry,
         coordinator,
+        "device_tracker",
         async_add_entities,
-        (),
-        ("bus",),
         TrafficalBusTracker,
     )
 
@@ -39,21 +37,14 @@ class TrafficalBusTracker(TrafficalEntity, TrackerEntity):
 
     @property
     def latitude(self) -> float | None:
-        if not self.available:
-            return None
-        return self.coordinator.ride(self.ride_key or "").get("lat")
+        return self._position(0)
 
     @property
     def longitude(self) -> float | None:
+        return self._position(1)
+
+    def _position(self, index: int) -> float | None:
         if not self.available:
             return None
-        return self.coordinator.ride(self.ride_key or "").get("lng")
-
-    @property
-    def available(self) -> bool:
-        if not super().available or not self.ride_key:
-            return False
-        ride = self.coordinator.ride(self.ride_key)
-        return (
-            status_live(str(ride.get("status") or "")) and ride.get("lat") is not None
-        )
+        position = self._state_value()
+        return position[index] if position else None

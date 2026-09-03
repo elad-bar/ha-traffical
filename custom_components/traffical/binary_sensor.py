@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .common.base_entity import TrafficalEntity
-from .common.entity_descriptions import HUB_BINARY, RIDE_BINARY
 from .common.entity_setup import async_setup_entities
 from .managers.coordinator import TrafficalCoordinator
 
@@ -27,9 +24,8 @@ async def async_setup_entry(
         hass,
         entry,
         coordinator,
+        "binary_sensor",
         async_add_entities,
-        HUB_BINARY,
-        RIDE_BINARY,
         TrafficalBinarySensor,
     )
 
@@ -37,17 +33,5 @@ async def async_setup_entry(
 class TrafficalBinarySensor(TrafficalEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool | None:
-        ride = self.coordinator.ride(self.ride_key or "")
-        check = ride.get("checkin")
-        if not isinstance(check, dict) or check.get("checkIn") is None:
-            return None
-        return bool(check.get("checkIn"))
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        if self.entity_key != "checked_in" or not self.ride_key:
-            return {}
-        check = self.coordinator.ride(self.ride_key).get("checkin") or {}
-        if not isinstance(check, dict):
-            return {}
-        return {"check_in_at": check.get("checkInAt")}
+        value = self._state_value()
+        return None if value is None else bool(value)
