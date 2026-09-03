@@ -50,7 +50,9 @@
       "my_station": { "name": "My station" },
       "destination": { "name": "Destination" },
       "driver": { "name": "Driver" },
-      "vehicle": { "name": "Vehicle" }
+      "vehicle": { "name": "Vehicle" },
+      "boarding_at": { "name": "Boarding" },
+      "dropoff_at": { "name": "Drop-off" }
     },
     "binary_sensor": {
       "checked_in": { "name": "Checked in" }
@@ -66,6 +68,9 @@
     },
     "device_tracker": {
       "bus": { "name": "Bus" }
+    },
+    "calendar": {
+      "rides": { "name": "Rides" }
     }
   },
   "device_automation": {

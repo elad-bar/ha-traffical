@@ -17,7 +17,7 @@ from custom_components.traffical.managers.signalr_client import (
     _parse_hub_args,
 )
 from custom_components.traffical.managers.store import SessionStore
-from custom_components.traffical.models.coordinates import MonitoredPath
+from custom_components.traffical.models.coordinates import MonitoredPath, haversine_m
 from custom_components.traffical.models.rides import (
     Ride,
     focus_ride_key,
@@ -183,6 +183,12 @@ async def test_mobile_hub_exits_when_session_closed() -> None:
     assert session.posts == 1
 
 
+def test_haversine_zero_and_known_span() -> None:
+    assert haversine_m(32.1, 34.8, 32.1, 34.8) == 0
+    metres = haversine_m(32.1, 34.8, 32.2, 34.9)
+    assert 14000 < metres < 16000
+
+
 def test_monitored_path_accepts_live_pascal_case_point() -> None:
     payload = {
         "Latitude": 32.12,
@@ -343,6 +349,71 @@ def test_ride_device_name_morning_home_to_school() -> None:
     assert Ride(row, details).device_name() == (
         "Traffical הרצוג 9, קדימה-צורן, ישראל - הכפר הירוק, רמת השרון, ישראל"
     )
+
+
+def test_home_station_afternoon_prefers_passenger_assignment() -> None:
+    row = {
+        "rideInfo": {
+            "passengerStationName": "חקלאי הכפר הירוק - רמת השרון",
+            "passengerDestinationName": "השומרון 11, קדימה-צורן, ישראל",
+        }
+    }
+    details = {
+        "stations": [
+            {
+                "id": 244399823,
+                "name": "חקלאי הכפר הירוק - רמת השרון",
+                "address": "הכפר הירוק, רמת השרון, ישראל",
+                "isTarget": True,
+            },
+            {
+                "id": 244399826,
+                "name": "השומרון 11, קדימה-צורן, ישראל",
+                "address": "הרצוג 7, קדימה-צורן, ישראל",
+                "passengers": [{"id": 551070}],
+            },
+        ]
+    }
+    ride = Ride(row, details)
+
+    home = ride.home_station(551070)
+    assert home is not None
+    assert home.address == "הרצוג 7, קדימה-צורן, ישראל"
+    assert ride.dropoff_station() is not None
+    assert ride.dropoff_station().name == "השומרון 11, קדימה-צורן, ישראל"
+    assert ride.boarding_station() is not None
+    assert ride.boarding_station().is_target
+    assert ride.your_station(551070) is not None
+    assert ride.your_station(551070).is_target
+
+
+def test_home_station_morning_is_boarding() -> None:
+    row = {
+        "rideInfo": {
+            "passengerStationName": "השומרון 11, קדימה-צורן, ישראל",
+            "passengerDestinationName": "חקלאי הכפר הירוק - רמת השרון",
+        }
+    }
+    details = {
+        "stations": [
+            {
+                "id": 1,
+                "name": "השומרון 11, קדימה-צורן, ישראל",
+                "address": "הרצוג 9, קדימה-צורן, ישראל",
+            },
+            {
+                "id": 2,
+                "name": "חקלאי הכפר הירוק - רמת השרון",
+                "address": "הכפר הירוק, רמת השרון, ישראל",
+                "isTarget": True,
+            },
+        ]
+    }
+    ride = Ride(row, details)
+
+    home = ride.home_station(None)
+    assert home is not None
+    assert home.address == "הרצוג 9, קדימה-צורן, ישראל"
 
 
 def test_ride_device_name_empty_without_station_addresses() -> None:

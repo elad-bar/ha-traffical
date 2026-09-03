@@ -124,6 +124,22 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
         icon="mdi:bus",
     ),
     EntitySpec(
+        key="boarding_at",
+        platform="sensor",
+        name="Boarding",
+        resolve="boarding_at",
+        device_class="timestamp",
+        icon="mdi:clock-start",
+    ),
+    EntitySpec(
+        key="dropoff_at",
+        platform="sensor",
+        name="Drop-off",
+        resolve="dropoff_at",
+        device_class="timestamp",
+        icon="mdi:clock-end",
+    ),
+    EntitySpec(
         key="checked_in",
         platform="binary_sensor",
         name="Checked in",
@@ -164,6 +180,12 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
         name="Bus",
         resolve="bus_position",
         availability="gps_live",
+    ),
+    EntitySpec(
+        key="rides",
+        platform="calendar",
+        name="Rides",
+        icon="mdi:calendar-clock",
     ),
     # --- per station of the focused ride ---
     EntitySpec(

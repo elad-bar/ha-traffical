@@ -50,7 +50,9 @@
       "my_station": { "name": "התחנה שלי" },
       "destination": { "name": "יעד" },
       "driver": { "name": "נהג" },
-      "vehicle": { "name": "רכב" }
+      "vehicle": { "name": "רכב" },
+      "boarding_at": { "name": "עלייה" },
+      "dropoff_at": { "name": "הורדה" }
     },
     "binary_sensor": {
       "checked_in": { "name": "נרשמו" }
@@ -66,6 +68,9 @@
     },
     "device_tracker": {
       "bus": { "name": "אוטובוס" }
+    },
+    "calendar": {
+      "rides": { "name": "נסיעות" }
     }
   },
   "device_automation": {

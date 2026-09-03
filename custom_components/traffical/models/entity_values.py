@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from .coordinates import haversine_m
 from .entity_specs import SCOPE_HUB, SCOPE_STATION, EntitySpec, policy_active
 from .rides import Ride, status_finished, status_live
 from .stations import Station
@@ -118,6 +119,8 @@ class EntityValueResolver:
             "bus_position": self._bus_position,
             "station_position": self._station_position,
             "child_current": self._child_current,
+            "boarding_at": self._boarding_at,
+            "dropoff_at": self._dropoff_at,
         }
         self._attributes: dict[str, Resolver] = {
             "next_ride": self._attrs_next_ride,
@@ -213,7 +216,7 @@ class EntityValueResolver:
     @staticmethod
     def _my_station(state: Mapping[str, Any], ctx: EntityContext) -> Any:
         ride = Ride.from_cache(state)
-        station = ride.your_station(ctx.member_id)
+        station = ride.boarding_station() or ride.your_station(ctx.member_id)
         stop = ride.passenger_stop
         if station is None:
             return stop or None
@@ -221,10 +224,11 @@ class EntityValueResolver:
 
     @staticmethod
     def _destination(state: Mapping[str, Any], _ctx: EntityContext) -> Any:
-        station = Ride.from_cache(state).target_station()
+        ride = Ride.from_cache(state)
+        station = ride.dropoff_station()
         if station is None:
-            return None
-        return station.name or station.address
+            return ride.passenger_destination or None
+        return station.label or ride.passenger_destination
 
     @staticmethod
     def _driver(state: Mapping[str, Any], _ctx: EntityContext) -> Any:
@@ -238,6 +242,14 @@ class EntityValueResolver:
     def _vehicle(state: Mapping[str, Any], _ctx: EntityContext) -> Any:
         details = state.get("details") or {}
         return details.get("carNumber") or _ride_info(state).get("carNumber")
+
+    @staticmethod
+    def _boarding_at(state: Mapping[str, Any], _ctx: EntityContext) -> Any:
+        return Ride.from_cache(state).boarding_at
+
+    @staticmethod
+    def _dropoff_at(state: Mapping[str, Any], _ctx: EntityContext) -> Any:
+        return Ride.from_cache(state).dropoff_at
 
     @staticmethod
     def _checked_in(state: Mapping[str, Any], _ctx: EntityContext) -> Any:
@@ -315,12 +327,20 @@ class EntityValueResolver:
 
     @staticmethod
     def _attrs_my_station(state: Mapping[str, Any], _ctx: EntityContext) -> Any:
-        return {"name": _ride_info(state).get("passengerStationName")}
+        arrival = Ride.from_cache(state).boarding_at
+        return {
+            "name": _ride_info(state).get("passengerStationName"),
+            "arrival": arrival.isoformat() if arrival is not None else None,
+        }
 
     @staticmethod
     def _attrs_destination(state: Mapping[str, Any], _ctx: EntityContext) -> Any:
-        station = Ride.from_cache(state).target_station()
-        return {"address": station.address if station is not None else None}
+        station = Ride.from_cache(state).dropoff_station()
+        arrival = Ride.from_cache(state).dropoff_at
+        return {
+            "address": station.address if station is not None else None,
+            "arrival": arrival.isoformat() if arrival is not None else None,
+        }
 
     @staticmethod
     def _attrs_vehicle(state: Mapping[str, Any], _ctx: EntityContext) -> Any:
@@ -345,6 +365,7 @@ class EntityValueResolver:
             "address": station.address,
             "kind": kind,
             "passed": _station_passed(state),
+            "distance_m": _station_distance_m(state),
         }
 
     # --- availability ---
@@ -377,6 +398,21 @@ class EntityValueResolver:
         return state.get("ride_key") == ctx.focus_ride_key
 
 
+def _same_station(left: Station, right: Station) -> bool:
+    if left.station_id and right.station_id:
+        return left.station_id == right.station_id
+    return bool(left.name) and left.name == right.name
+
+
+def _station_distance_m(state: Mapping[str, Any]) -> int | None:
+    ride = state.get("ride") if isinstance(state.get("ride"), Mapping) else {}
+    station = _station(state)
+    lat, lng = ride.get("lat"), ride.get("lng")
+    if lat is None or lng is None or station.lat is None or station.lng is None:
+        return None
+    return int(haversine_m(float(lat), float(lng), station.lat, station.lng))
+
+
 def _station_passed(state: Mapping[str, Any]) -> bool:
     ride = state.get("ride") if isinstance(state.get("ride"), Mapping) else {}
     station = _station(state)
@@ -387,7 +423,8 @@ def _station_passed(state: Mapping[str, Any]) -> bool:
 def _station_kind(state: Mapping[str, Any], ctx: EntityContext) -> str:
     ride = state.get("ride") if isinstance(state.get("ride"), Mapping) else {}
     station = _station(state)
-    if station.is_yours(Ride.from_cache(ride).passenger_stop, ctx.member_id):
+    home = Ride.from_cache(ride).home_station(ctx.member_id)
+    if home is not None and _same_station(home, station):
         return "home"
     if station.is_target:
         return "target"

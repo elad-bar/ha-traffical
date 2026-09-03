@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from ..common.helpers import partial_id
@@ -9,6 +10,16 @@ from ..common.helpers import partial_id
 # Car, driver, and accompany build the vehicle trail on the Traffical map;
 # passenger and supervisor positions are other people, not the bus.
 _BUS_SOURCE_TYPES = frozenset({1, 2, 4})
+
+
+def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance in metres."""
+    radius = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * radius * math.asin(math.sqrt(a))
 
 
 def coord_from_payload(payload: Any) -> tuple[float | None, float | None]:

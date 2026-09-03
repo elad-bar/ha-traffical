@@ -52,6 +52,9 @@ _RIDE = {
     "list_row": {
         "rideInfo": {
             "passengerStationName": "Main st 5",
+            "passengerDestinationName": "School",
+            "passengerStationArrivalDateTime": "2026-09-03T05:40:00Z",
+            "passengerDestinationArrivalDateTime": "2026-09-03T06:10:00Z",
             "shuttleCompany": "Co",
         }
     },
@@ -95,6 +98,7 @@ def _station_state(station_id: str) -> dict:
         ("next_ride", None, None, "traffical_next_ride"),
         ("status", "392681:120", None, "traffical_392681_120_status"),
         ("stop", "392681:120", "34838", "traffical_392681_120_stop_34838"),
+        ("rides", "392681:120", None, "traffical_392681_120_rides"),
     ],
 )
 def test_entity_object_id_uses_route_and_station_ids(
@@ -122,8 +126,20 @@ def test_every_spec_key_has_an_english_name() -> None:
 def test_specs_filter_by_platform_and_scope() -> None:
     hub_sensors = get_entity_specs("sensor", scope=SCOPE_HUB)
     assert [spec.key for spec in hub_sensors] == ["next_ride"]
+    assert [spec.key for spec in get_entity_specs("calendar", scope=SCOPE_HUB)] == []
+    assert [spec.key for spec in get_entity_specs("calendar", scope=SCOPE_RIDE)] == [
+        "rides"
+    ]
     ride_sensors = {spec.key for spec in get_entity_specs("sensor", scope=SCOPE_RIDE)}
-    assert ride_sensors == {"status", "my_station", "destination", "driver", "vehicle"}
+    assert ride_sensors == {
+        "status",
+        "my_station",
+        "destination",
+        "driver",
+        "vehicle",
+        "boarding_at",
+        "dropoff_at",
+    }
 
 
 def test_policy_gate_hides_report_buttons() -> None:
@@ -179,6 +195,14 @@ def test_ride_attributes_resolve() -> None:
         "type": 3,
         "shuttle_company": "Co",
     }
+    my_station = resolver.resolve_attributes(_spec("my_station"), _RIDE, _CTX)
+    assert my_station["name"] == "Main st 5"
+    assert my_station["arrival"] == "2026-09-03T05:40:00+00:00"
+    dest = resolver.resolve_attributes(_spec("destination"), _RIDE, _CTX)
+    assert dest["address"] == "School rd 1"
+    assert dest["arrival"] == "2026-09-03T06:10:00+00:00"
+    assert resolver.resolve_value(_spec("boarding_at"), _RIDE, _CTX).hour == 5
+    assert resolver.resolve_value(_spec("dropoff_at"), _RIDE, _CTX).hour == 6
 
 
 def test_availability_rules() -> None:
@@ -227,6 +251,66 @@ def test_station_name_icon_and_kind() -> None:
     assert resolver.resolve_icon(spec, target, _CTX) == "mdi:school"
     assert resolver.resolve_attributes(spec, target, _CTX)["kind"] == "target"
     assert resolver.resolve_value(spec, target, _CTX) == (32.2, 34.9)
+    live = {
+        **_RIDE,
+        "lat": 32.1,
+        "lng": 34.8,
+    }
+    attrs = resolver.resolve_attributes(
+        spec, {"ride": live, "ride_key": "1:0", "station_id": "s1"}, _CTX
+    )
+    assert attrs["distance_m"] == 0
+    assert resolver.resolve_attributes(spec, home, _CTX)["distance_m"] is None
+
+
+def test_afternoon_destination_and_single_home_icon() -> None:
+    ride = {
+        "key": "428988:121",
+        "status": "New",
+        "assigned_today": True,
+        "list_row": {
+            "rideInfo": {
+                "passengerStationName": "חקלאי הכפר הירוק - רמת השרון",
+                "passengerDestinationName": "השומרון 11, קדימה-צורן, ישראל",
+            }
+        },
+        "details": {
+            "stations": [
+                {
+                    "stationId": "school",
+                    "name": "חקלאי הכפר הירוק - רמת השרון",
+                    "address": "הכפר הירוק, רמת השרון, ישראל",
+                    "isTarget": True,
+                    "lat": 32.13,
+                    "lng": 34.83,
+                },
+                {
+                    "stationId": "home",
+                    "name": "השומרון 11, קדימה-צורן, ישראל",
+                    "address": "הרצוג 7, קדימה-צורן, ישראל",
+                    "lat": 32.28,
+                    "lng": 34.91,
+                    "passengers": [{"id": 551070}],
+                },
+            ]
+        },
+        "passed_stations": set(),
+    }
+    ctx = EntityContext(member_id=551070, session_ok=True, focus_ride_key="428988:121")
+    resolver = EntityValueResolver()
+
+    assert resolver.resolve_value(_spec("my_station"), ride, ctx) == (
+        "הכפר הירוק, רמת השרון, ישראל"
+    )
+    assert resolver.resolve_value(_spec("destination"), ride, ctx) == (
+        "הרצוג 7, קדימה-צורן, ישראל"
+    )
+    school = {"ride": ride, "ride_key": "428988:121", "station_id": "school"}
+    house = {"ride": ride, "ride_key": "428988:121", "station_id": "home"}
+    assert resolver.resolve_attributes(_spec("stop"), school, ctx)["kind"] == "target"
+    assert resolver.resolve_attributes(_spec("stop"), house, ctx)["kind"] == "home"
+    assert resolver.resolve_icon(_spec("stop"), house, ctx) == "mdi:home"
+    assert resolver.resolve_icon(_spec("stop"), school, ctx) == "mdi:school"
 
 
 def test_station_only_available_on_the_focused_ride() -> None:

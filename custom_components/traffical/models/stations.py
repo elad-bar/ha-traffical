@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
+
+from ..common.helpers import parse_utc
 
 
 def station_event_id(payload: Any) -> str | None:
@@ -57,6 +60,14 @@ class Station:
         return self._raw.get("actualArriveDateTime") is not None
 
     @property
+    def arrival_time(self) -> datetime | None:
+        return parse_utc(self._raw.get("arrivalTime"))
+
+    @property
+    def actual_arrival(self) -> datetime | None:
+        return parse_utc(self._raw.get("actualArriveDateTime"))
+
+    @property
     def lat(self) -> float | None:
         return self._coord("lat")
 
@@ -70,10 +81,8 @@ class Station:
         except (TypeError, ValueError):
             return None
 
-    def is_yours(self, passenger_stop: str, member_id: int | None) -> bool:
-        """Whether this stop is the passenger's own, by name or assignment."""
-        if passenger_stop and self.name == passenger_stop.strip():
-            return True
+    def has_passenger(self, member_id: int | None) -> bool:
+        """Whether ``passengers[]`` lists this member."""
         if member_id is None:
             return False
         passengers = self._raw.get("passengers") or []
@@ -88,3 +97,9 @@ class Station:
             except (TypeError, ValueError):
                 continue
         return False
+
+    def is_yours(self, passenger_stop: str, member_id: int | None) -> bool:
+        """Whether this stop is the passenger's own, by name or assignment."""
+        if passenger_stop and self.name == passenger_stop.strip():
+            return True
+        return self.has_passenger(member_id)

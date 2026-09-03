@@ -109,9 +109,11 @@ Friendly name is `Traffical {from address} - {to address}` once ride details hav
 Entities on each ride device:
 
 - Status, check-in, driver, vehicle
+- Boarding / drop-off timestamp sensors
 - Check-in / check-out / not coming buttons
 - Bus `device_tracker`
-- Station `geo_location`s (shown only for the focus ride: live, else next unfinished today)
+- Rides calendar (`calendar.traffical_{ride}_rides`): today’s occurrence (even if finished) plus the next listed day for that line within the 4-day lookahead
+- Station `geo_location`s (shown only for the focus ride: live, else next unfinished today; state is km from the bus while GPS is live)
 
 **No assignment today** (weekend, holiday, not coming, empty list): the ride device stays in the registry and goes **unavailable**. Do not delete and recreate it.
 
@@ -151,10 +153,13 @@ Unavailable buttons stay on the device and are greyed out (`available = False`).
 | Entity | Role |
 |--------|------|
 | `sensor.traffical_next_ride` | Next (or current) ride: direction, start, my station, destination, `ride_id`, ticket, `service_date` (may be after today, up to 4 days) |
+| `calendar.traffical_{ride}_rides` | That line only: today’s listed occurrence plus the next cached day (no school-year projection) |
 | `sensor.traffical_{ride}_status` | `New`, `Ongoing`, `OngoingMonitored`, `Finished`, `FinishedMonitored`, … |
 | `binary_sensor.traffical_{ride}_checked_in` | From `CheckIn/GetStatuses` (`checkIn`, `checkInAt`); unknown if `checkIn` is null |
-| `sensor.traffical_{ride}_my_station` | Assigned stop **address** (geocoded `address`; keep raw `name` as a secondary attribute), scheduled arrival, lat/lng |
-| `sensor.traffical_{ride}_destination` | Destination **name** (`isTarget` stations keep `name`; expose `address` as an attribute) and scheduled arrival |
+| `sensor.traffical_{ride}_my_station` | Boarding stop **address** (geocoded `address`; keep raw `name` as a secondary attribute) |
+| `sensor.traffical_{ride}_destination` | Drop-off from `passengerDestinationName`, not `isTarget`. School/activity keeps **name**; a street stop uses **address** |
+| `sensor.traffical_{ride}_boarding_at` | `passengerStationArrivalDateTime` |
+| `sensor.traffical_{ride}_dropoff_at` | `passengerDestinationArrivalDateTime` |
 | `sensor.traffical_{ride}_driver` | Name / mobile when assigned (often empty until close to departure) |
 | `sensor.traffical_{ride}_vehicle` | Plate, type, shuttle company |
 
@@ -181,7 +186,7 @@ One `geo_location` per station on that ride device (today’s path). They show o
 | Kind | Detection | Icon (example) | Color |
 |------|-----------|----------------|-------|
 | **Target** (school / activity) | Station `isTarget: true` | `mdi:school` | Amber |
-| **Home station** | Station whose `passengers[]` contains this `memberId` | `mdi:home` | Blue |
+| **Home station** | `Ride.home_station`: `passengers[]` for this `memberId`, else drop-off when boarding is `isTarget` | `mdi:home` | Blue |
 | **Pending** | No `actualArriveDateTime` and no `ArrivedToStation` yet | `mdi:bus-stop` | Grey |
 | **Passed** | `actualArriveDateTime` set **or** SignalR `ArrivedToStation` for that `stationId` | `mdi:bus-stop-uncovered` | Muted green |
 

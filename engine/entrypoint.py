@@ -531,9 +531,13 @@ class App:
         if not stations:
             return
         print("    Stations:")
+        home = ride.home_station(member_id)
         for station in stations:
             marks = []
-            if station.is_yours(passenger_stop, member_id):
+            if home is not None and (
+                (home.station_id and home.station_id == station.station_id)
+                or (not home.station_id and home.name == station.name)
+            ):
                 marks.append("← you")
             if station.is_target:
                 marks.append("(destination)")

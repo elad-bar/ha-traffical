@@ -115,15 +115,17 @@ actions:
       message: "Driver {{ trigger.to_state.state }} ({{ states('sensor.YOUR_RIDE_vehicle') }})"
 ```
 
-## Get ready (no calendar entity)
+## Get ready (calendar offset)
 
-There is no `calendar.traffical_rides` yet. Use a weekday time plus ride status.
+Each ride device has `calendar.traffical_{ride}_rides` (today plus the next listed day). Offset from that event, and keep a `status == New` condition so a leftover finished event does not fire.
 
 ```yaml
 alias: Traffical — morning get ready
 triggers:
-  - trigger: time
-    at: "07:10:00"
+  - trigger: calendar
+    entity_id: calendar.YOUR_MORNING_RIDE_rides
+    event: start
+    offset: "-00:20:00"
 conditions:
   - condition: state
     entity_id: sensor.YOUR_MORNING_RIDE_status

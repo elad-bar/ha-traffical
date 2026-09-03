@@ -67,6 +67,7 @@ PLATFORMS = (
     "select",
     "device_tracker",
     "geo_location",
+    "calendar",
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]

@@ -130,6 +130,14 @@ class Ride:
         return str(self._info.get("passengerDestinationName") or "")
 
     @property
+    def boarding_at(self) -> datetime | None:
+        return parse_utc(self._info.get("passengerStationArrivalDateTime"))
+
+    @property
+    def dropoff_at(self) -> datetime | None:
+        return parse_utc(self._info.get("passengerDestinationArrivalDateTime"))
+
+    @property
     def stations(self) -> list[Station]:
         raw = self._details.get("stations")
         if not isinstance(raw, list):
@@ -143,6 +151,16 @@ class Ride:
                 return station
         return None
 
+    def boarding_station(self) -> Station | None:
+        """Boarding stop by ``passengerStationName`` only (not ``passengers[]``)."""
+        stop = self.passenger_stop.strip()
+        if not stop:
+            return None
+        for station in self.stations:
+            if station.name == stop:
+                return station
+        return None
+
     def dropoff_station(self, _member_id: int | None = None) -> Station | None:
         """Passenger drop-off by destination name, not the school ``isTarget`` stop."""
         dest = self.passenger_destination.strip()
@@ -152,6 +170,18 @@ class Ride:
             if station.name == dest:
                 return station
         return None
+
+    def home_station(self, member_id: int | None) -> Station | None:
+        """The house stop: assigned passenger row, else drop-off when boarding is school."""
+        assigned = [
+            station for station in self.stations if station.has_passenger(member_id)
+        ]
+        if assigned:
+            return assigned[0]
+        boarding = self.boarding_station()
+        if boarding is not None and boarding.is_target:
+            return self.dropoff_station()
+        return boarding
 
     def device_name(self, member_id: int | None = None) -> str:
         """Friendly HA device title from from/to addresses, or empty."""

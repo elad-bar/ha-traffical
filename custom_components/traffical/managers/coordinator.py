@@ -6,7 +6,6 @@ import asyncio
 from collections.abc import Callable
 from datetime import date, datetime, timedelta, timezone
 import logging
-import math
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -30,7 +29,7 @@ from ..common.consts import (
     POLL_INTERVAL_FAST,
 )
 from ..common.helpers import client_session, parse_utc, partial_id
-from ..models.coordinates import MonitoredPath, coord_from_payload
+from ..models.coordinates import MonitoredPath, coord_from_payload, haversine_m
 from ..models.entity_specs import policy_active
 from ..models.entity_values import EntityContext
 from ..models.exceptions import ApiError, AuthError
@@ -48,15 +47,6 @@ from .signalr_client import SignalRHubs
 from .store import SessionStore
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    r = 6371000.0
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dp = math.radians(lat2 - lat1)
-    dl = math.radians(lon2 - lon1)
-    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-    return 2 * r * math.asin(math.sqrt(a))
 
 
 class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -601,13 +591,12 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 ride["passed_stations"] = passed
             member_id = self.member_id()
             cached = Ride.from_cache(ride)
-            is_mine = False
-            for station in cached.stations:
-                if str(station.station_id or "") == str(sid) and station.is_yours(
-                    cached.passenger_stop, member_id
-                ):
-                    is_mine = True
-                    break
+            home = cached.home_station(member_id)
+            is_mine = bool(
+                home is not None
+                and sid is not None
+                and str(home.station_id or "") == str(sid)
+            )
             self.hass.bus.async_fire(
                 EVENT_ARRIVED_STATION,
                 {
@@ -629,7 +618,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if home is None:
             return
         hlat, hlng = home
-        distance = _haversine_m(float(lat), float(lng), hlat, hlng)
+        distance = haversine_m(float(lat), float(lng), hlat, hlng)
         if distance > 80:
             return
         ride["approaching_fired"] = True
@@ -643,7 +632,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
     def _home_station(self, ride: dict[str, Any]) -> tuple[float, float] | None:
-        station = Ride.from_cache(ride).your_station(self.member_id())
+        station = Ride.from_cache(ride).home_station(self.member_id())
         if station is None or station.lat is None or station.lng is None:
             return None
         return station.lat, station.lng

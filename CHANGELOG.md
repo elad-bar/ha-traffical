@@ -6,13 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.1.4] - 2026-09-03
 
+### Added
+
+- Boarding and drop-off timestamp sensors from `passengerStationArrivalDateTime` and `passengerDestinationArrivalDateTime`
+
 ### Changed
 
 - Ride device title is `Traffical {from address} - {to address}` (passenger pickup and drop-off), not the shared line name
+- Station map pins show distance from the live bus (km) instead of staying unknown
+- Ride calendar is per line (`calendar.traffical_{ride}_rides`): today’s listed occurrence plus the next cached day, not a hub school-year projection
 
 ### Fixed
 
 - Rename entity ids restored from the registry (including after remove and re-add) onto the id-based scheme when the entity is added
+- Destination and home-stop icons use passenger drop-off, not the school `isTarget` flag, so afternoon rides no longer show two homes
 
 ## [0.1.3] - 2026-09-03
 

@@ -11,6 +11,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 from homeassistant.components.button import ButtonEntityDescription
+from homeassistant.components.calendar import CalendarEntityDescription
 from homeassistant.components.select import SelectEntityDescription
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -81,6 +82,8 @@ def get_entity_description(spec: EntitySpec) -> EntityDescription:
 
     if platform == "button":
         return ButtonEntityDescription(**base)
+    if platform == "calendar":
+        return CalendarEntityDescription(**base)
     if platform == "select":
         return SelectEntityDescription(**base)
 

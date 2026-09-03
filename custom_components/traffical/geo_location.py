@@ -45,6 +45,13 @@ class TrafficalStop(TrafficalEntity, GeolocationEvent):
     def longitude(self) -> float | None:
         return self._position(1)
 
+    @property
+    def distance(self) -> float | None:
+        metres = self.extra_state_attributes.get("distance_m")
+        if metres is None:
+            return None
+        return metres / 1000.0
+
     def _position(self, index: int) -> float | None:
         position = self._state_value()
         return position[index] if position else None

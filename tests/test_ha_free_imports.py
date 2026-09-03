@@ -18,6 +18,7 @@ _HA_FREE_MODULES = (
     "traffical.models.coordinates",
     "traffical.models.entity_specs",
     "traffical.models.entity_values",
+    "traffical.models.ride_calendar",
     "traffical.models.ride_window",
     "traffical.models.rides",
     "traffical.models.stations",
