@@ -50,7 +50,7 @@ class TrafficalEntity(CoordinatorEntity[TrafficalCoordinator]):
         self._attr_device_info = DeviceInfo(**info)
 
     @property
-    def _context(self) -> EntityContext:
+    def _entity_ctx(self) -> EntityContext:
         return self.coordinator.entity_context()
 
     def _state(self) -> dict[str, Any]:
@@ -68,15 +68,15 @@ class TrafficalEntity(CoordinatorEntity[TrafficalCoordinator]):
 
     @property
     def available(self) -> bool:
-        return self._resolver.is_available(self.spec, self._state(), self._context)
+        return self._resolver.is_available(self.spec, self._state(), self._entity_ctx)
 
     def _state_value(self) -> Any:
-        return self._resolver.resolve_value(self.spec, self._state(), self._context)
+        return self._resolver.resolve_value(self.spec, self._state(), self._entity_ctx)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return self._resolver.resolve_attributes(
-            self.spec, self._state(), self._context
+            self.spec, self._state(), self._entity_ctx
         )
 
     async def _async_send_action(self) -> None:

@@ -31,11 +31,11 @@ class TrafficalStop(TrafficalEntity, GeolocationEvent):
 
     @property
     def name(self) -> str | None:
-        return self._resolver.resolve_name(self.spec, self._state(), self._context)
+        return self._resolver.resolve_name(self.spec, self._state(), self._entity_ctx)
 
     @property
     def icon(self) -> str | None:
-        return self._resolver.resolve_icon(self.spec, self._state(), self._context)
+        return self._resolver.resolve_icon(self.spec, self._state(), self._entity_ctx)
 
     @property
     def latitude(self) -> float | None:

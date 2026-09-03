@@ -29,14 +29,16 @@ async def async_setup_entry(
 class TrafficalSelect(TrafficalEntity, SelectEntity):
     @property
     def options(self) -> list[str]:
-        return self._resolver.resolve_options(self.spec, self._state(), self._context)
+        return self._resolver.resolve_options(
+            self.spec, self._state(), self._entity_ctx
+        )
 
     @property
     def current_option(self) -> str | None:
         return self._state_value()
 
     async def async_select_option(self, option: str) -> None:
-        child_id = child_id_for_label(option, self._context)
+        child_id = child_id_for_label(option, self._entity_ctx)
         if child_id is None:
             return
         await self.coordinator.async_switch_child(child_id)
