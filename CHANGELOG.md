@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Home Assistant setup always uses Live hosts; environment is no longer a config-flow field
 - Engine CLI always uses Live hosts (no `--env`); same hosts as Home Assistant
 
+### Fixed
+
+- Set `entity_id` from route, direction, and station ids; `_attr_suggested_object_id` was ignored so ids still used transliterated device names
+
 ## [0.1.2] - 2026-09-03
 
 ### Fixed

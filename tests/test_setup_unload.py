@@ -87,6 +87,8 @@ async def test_async_setup_and_unload_entry(hass: HomeAssistant) -> None:
     with _api_patches():
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
+        assert hass.states.get("sensor.traffical_next_ride") is not None
+        assert hass.states.get("sensor.traffical_school_next_ride") is None
         assert await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()
 

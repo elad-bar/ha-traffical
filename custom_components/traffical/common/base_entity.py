@@ -43,8 +43,8 @@ class TrafficalEntity(CoordinatorEntity[TrafficalCoordinator]):
         if station_id:
             parts.append(station_id)
         self._attr_unique_id = "_".join(parts)
-        self._attr_suggested_object_id = entity_object_id(
-            spec.key, ride_key, station_id
+        self.entity_id = (
+            f"{spec.platform}.{entity_object_id(spec.key, ride_key, station_id)}"
         )
         info = (
             coordinator.hub_device_info()
