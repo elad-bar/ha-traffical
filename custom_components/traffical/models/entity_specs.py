@@ -225,6 +225,15 @@ def _when_ok(when: str | None, caps: Mapping[str, Any]) -> bool:
     return True
 
 
+def station_pins_wanted(
+    ride_key: str, ride: Mapping[str, Any] | None, focus_ride_key: str | None
+) -> bool:
+    """Station geo_locations exist only for the map-focus assigned ride."""
+    if not ride_key or ride_key != focus_ride_key:
+        return False
+    return bool(isinstance(ride, Mapping) and ride.get("assigned_today"))
+
+
 def get_entity_specs(
     platform: str | None = None,
     *,

@@ -513,12 +513,15 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 ride.get("details") or {},
                 ride.get("list_row") or {},
             )
+        previous_focus = (self.data or {}).get("focus_ride_key")
         live_key = self.window.live_key
         self.data["live_key"] = live_key
         self.data["focus"] = self.window.focus
         self.data["focus_ride_key"] = self.window.map_focus_key
         await self._sync_signalr(live_key, rides)
         self.async_set_updated_data(self.data)
+        if self.data.get("focus_ride_key") != previous_focus:
+            self._notify_entities()
         if status_finished(status_raw) and self.data.get("focus") is None:
             await self.async_request_refresh()
 

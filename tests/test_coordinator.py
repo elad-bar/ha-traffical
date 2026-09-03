@@ -447,3 +447,87 @@ async def test_stop_does_not_rearm_signalr(hass: HomeAssistant) -> None:
         assert start_mobile.await_count == mobile_calls
         assert start_track.await_count == track_calls
         assert restart.await_count == restart_calls
+
+
+@pytest.mark.asyncio
+async def test_entity_listeners_fire_when_focus_key_changes_not_on_gps(
+    hass: HomeAssistant,
+) -> None:
+    entry = _entry(hass)
+    with (
+        patch(
+            "custom_components.traffical.managers.identity_client.IdentityClient.userinfo",
+            new_callable=AsyncMock,
+            return_value=_USER,
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.user_roles",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.passenger_policies",
+            new_callable=AsyncMock,
+            return_value={},
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.list_rides",
+            new_callable=AsyncMock,
+            return_value=[_RIDE],
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.checkin_statuses",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.ride_details",
+            new_callable=AsyncMock,
+            return_value=_DETAILS,
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.monitoring_path",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.start_mobile",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.stop_mobile",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.start_track",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.stop_track",
+            new_callable=AsyncMock,
+        ),
+    ):
+        coordinator = await async_create_coordinator(hass, entry)
+        await coordinator.async_start()
+        try:
+            hits: list[int] = []
+            coordinator.register_entity_listener(lambda: hits.append(1))
+            await coordinator._on_mobile_hub_event(
+                "UpdateRideStatus",
+                {"Id": 39306112, "Status": "OngoingMonitored"},
+            )
+            assert hits == []
+            await coordinator._on_hub_event(
+                "ReceiveCoordinates",
+                {"Latitude": 32.12, "Longitude": 34.8, "SourceType": 2},
+            )
+            assert hits == []
+            await coordinator._on_mobile_hub_event(
+                "UpdateRideStatus",
+                {"Id": 39306112, "Status": "FinishedMonitored"},
+            )
+            # Focus becomes None (one notify). Finish with no remaining
+            # focus also refreshes the ride list (second notify).
+            assert hits == [1, 1]
+        finally:
+            await coordinator.async_stop()

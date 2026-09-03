@@ -16,6 +16,7 @@ from ..models.entity_specs import (
     SCOPE_STATION,
     EntitySpec,
     get_entity_specs,
+    station_pins_wanted,
 )
 from ..models.rides import Ride
 from .base_entity import TrafficalEntity
@@ -51,7 +52,9 @@ def async_setup_entities(
                 platform, scope=SCOPE_RIDE, state=ride, caps=caps
             ):
                 out[(ride_key, spec.key, None)] = (spec, ride_key, None)
-            if not ride.get("assigned_today"):
+            if not station_pins_wanted(
+                ride_key, ride, (coordinator.data or {}).get("focus_ride_key")
+            ):
                 continue
             station_specs = get_entity_specs(
                 platform, scope=SCOPE_STATION, state=ride, caps=caps

@@ -113,7 +113,7 @@ Entities on each ride device:
 - Check-in / check-out / not coming buttons
 - Bus `device_tracker`
 - Rides calendar (`calendar.traffical_{ride}_rides`): today’s occurrence (even if finished) plus the next listed day for that line within the 4-day lookahead
-- Station `geo_location`s (shown only for the focus ride: live, else next unfinished today; state is km from the bus while GPS is live)
+- Station `geo_location`s (created only for the focus ride: live, else next unfinished today; removed otherwise; state is km from the bus while GPS is live)
 
 **No assignment today** (weekend, holiday, not coming, empty list): the ride device stays in the registry and goes **unavailable**. Do not delete and recreate it.
 
@@ -181,7 +181,7 @@ Optional: delay vs schedule, progress along stations, “approaching my stop”.
 
 Stations are not extra `device_tracker`s (they do not move) and not a **normal** HA zone per stop (that would steal “in zone” from people and from the bus).
 
-One `geo_location` per station on that ride device (today’s path). They show on the default Map **only for the bound focus ride**: a live `Ongoing*` ride if any, otherwise the next unfinished **assigned today** ride (earliest start). Finished / earlier same-day rides keep their markers in the registry but unavailable. After the last **today** ride finishes, no station pins (tomorrow’s trip is not drawn on a device whose status is still Finished). Friendly name is the station **address** (it matches `lat`/`lng`); keep `name` as an extra attribute because it is often a stale dispatcher label. For `isTarget` stations, prefer **name** (school / activity) and keep `address` as an attribute. Icon and color depend on **role** and **progress**:
+One `geo_location` per station on the **focus** ride device (today’s path). Pins are **created** only for that ride: a live `Ongoing*` ride if any, otherwise the next unfinished **assigned today** ride (earliest start). Other rides have no station entities. After the last **today** ride finishes, all station pins are **removed** (not left unavailable). Tomorrow’s trip is not drawn on a device whose status is still Finished. Friendly name is the station **address** (it matches `lat`/`lng`); keep `name` as an extra attribute because it is often a stale dispatcher label. For `isTarget` stations, prefer **name** (school / activity) and keep `address` as an attribute. Icon and color depend on **role** and **progress**:
 
 | Kind | Detection | Icon (example) | Color |
 |------|-----------|----------------|-------|
@@ -197,7 +197,7 @@ If home and target are the same stop, prefer the **home** icon when it is *your*
 - Morning (e.g. `direction` 120): home = pickup, target = school.
 - Afternoon (e.g. `direction` 121): school is **start** (`isTarget` on the first station); home is **drop-off**. Target marker is still school; home marker is still the passenger stop.
 
-When there is no focus ride (evening / all finished / list empty), hide or **unavailable** the station markers so they do not clutter the map. Keep the **ride device**. Station ids may change; recreate markers as needed, still attached to the same ride device.
+When there is no focus ride (evening / all finished / list empty), station markers are removed. Keep the **ride device**. Station ids may change; recreate markers as needed, still attached to the same ride device.
 
 Do **not** create HA `zone` entities. Station `geo_location`s are the map pins; “van at our stop” is `traffical_approaching_stop` (or the same device trigger on the ride device).
 

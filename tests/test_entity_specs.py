@@ -14,6 +14,7 @@ from custom_components.traffical.models.entity_specs import (
     SCOPE_RIDE,
     get_entity_specs,
     spec_as_dict,
+    station_pins_wanted,
 )
 from custom_components.traffical.models.entity_values import (
     EntityContext,
@@ -140,6 +141,14 @@ def test_specs_filter_by_platform_and_scope() -> None:
         "boarding_at",
         "dropoff_at",
     }
+
+
+def test_station_pins_wanted_only_focus_assigned_ride() -> None:
+    assigned = {"assigned_today": True}
+    assert station_pins_wanted("1:0", assigned, "1:0") is True
+    assert station_pins_wanted("9:1", assigned, "1:0") is False
+    assert station_pins_wanted("1:0", {"assigned_today": False}, "1:0") is False
+    assert station_pins_wanted("1:0", assigned, None) is False
 
 
 def test_policy_gate_hides_report_buttons() -> None:

@@ -76,7 +76,7 @@ Ride entities go unavailable when that line is not assigned today.
 
 ### Map
 
-One `geo_location` marker per station on today’s path. Markers are **shown only for the live ride**, or if none is live, the **next unfinished ride assigned today**. Past same-day rides hide their stops. After the last ride **today** finishes, the map is clear of station pins (Next ride may still show tomorrow).
+One `geo_location` marker per station on the **focus** ride only (live, else the next unfinished ride assigned today). Pins are created and removed with that focus; other rides have none. After the last ride **today** finishes, the map has no station pins (Next ride may still show tomorrow).
 
 The bus tracker is a GPS pin while the ride is live. This integration does **not** create Home Assistant zones.
 
