@@ -102,7 +102,7 @@ A Traffical **`rideId` is a one-day instance**. Do **not** create a new HA devic
 | Morning inbound | `routeId` 392681, `direction` 120 | `rideId` 39306112 |
 | Afternoon outbound | `routeId` 428988, `direction` 121 | `rideId` 38592351 |
 
-Entity ids stay stable (`device_tracker.traffical_afternoon_bus`). The coordinator writes **today’s** `rideId`, ticket, times, and stations onto that device. A finished today occurrence is not replaced by the next day’s `New` instance until the calendar date rolls.
+Entity ids stay stable (`device_tracker.traffical_392681_120_bus`). The coordinator writes **today’s** `rideId`, ticket, times, and stations onto that device. A finished today occurrence is not replaced by the next day’s `New` instance until the calendar date rolls.
 
 Entities on each ride device:
 
@@ -113,7 +113,7 @@ Entities on each ride device:
 
 **No assignment today** (weekend, holiday, not coming, empty list): the ride device stays in the registry and goes **unavailable**. Do not delete and recreate it.
 
-`{ride}` in entity ids below means this stable route+direction slug, not the daily `rideId`.
+`{ride}` in entity ids below is `{routeId}_{direction}` (the suggested object id), not the daily `rideId` and not the Hebrew ride name. Stations are `geo_location.traffical_{ride}_stop_{stationId}`. Existing installs keep old `entity_id`s until those entities are removed from the registry.
 
 ---
 

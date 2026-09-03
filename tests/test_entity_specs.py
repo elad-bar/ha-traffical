@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from custom_components.traffical.common.helpers import entity_object_id
 from custom_components.traffical.models.entity_specs import (
     ENTITY_SPECS,
     SCOPE_HUB,
@@ -86,6 +87,20 @@ def _spec(key: str):
 
 def _station_state(station_id: str) -> dict:
     return {"ride": _RIDE, "ride_key": "1:0", "station_id": station_id}
+
+
+@pytest.mark.parametrize(
+    ("key", "ride_key", "station_id", "expected"),
+    [
+        ("next_ride", None, None, "traffical_next_ride"),
+        ("status", "392681:120", None, "traffical_392681_120_status"),
+        ("stop", "392681:120", "34838", "traffical_392681_120_stop_34838"),
+    ],
+)
+def test_entity_object_id_uses_route_and_station_ids(
+    key: str, ride_key: str | None, station_id: str | None, expected: str
+) -> None:
+    assert entity_object_id(key, ride_key, station_id) == expected
 
 
 def test_catalog_keys_are_unique_per_platform() -> None:

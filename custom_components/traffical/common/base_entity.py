@@ -15,6 +15,7 @@ from ..managers.coordinator import TrafficalCoordinator
 from ..models.entity_specs import SCOPE_HUB, SCOPE_STATION, EntitySpec
 from ..models.entity_values import EntityContext, EntityValueResolver
 from .entity_descriptions import get_entity_description
+from .helpers import entity_object_id
 
 
 class TrafficalEntity(CoordinatorEntity[TrafficalCoordinator]):
@@ -42,6 +43,9 @@ class TrafficalEntity(CoordinatorEntity[TrafficalCoordinator]):
         if station_id:
             parts.append(station_id)
         self._attr_unique_id = "_".join(parts)
+        self._attr_suggested_object_id = entity_object_id(
+            spec.key, ride_key, station_id
+        )
         info = (
             coordinator.hub_device_info()
             if ride_key is None

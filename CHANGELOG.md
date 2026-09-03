@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.1.1] - 2026-09-03
 
+### Changed
+
+- Suggest entity object ids from route, direction, and station ids (`traffical_392681_120_status`) instead of transliterating Hebrew device and station names
+
 ### Fixed
 
 - Rename `TrafficalEntity._context` so it no longer shadows Home Assistant `Entity._context` (entities failed to finish adding: `'EntityContext' object has no attribute 'origin_event'`)

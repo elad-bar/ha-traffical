@@ -71,6 +71,19 @@ def client_session() -> aiohttp.ClientSession:
     return aiohttp.ClientSession(connector=connector, timeout=timeout)
 
 
+def entity_object_id(
+    key: str, ride_key: str | None = None, station_id: str | None = None
+) -> str:
+    """Stable HA object id from catalog key and route/station ids, not names."""
+    parts = ["traffical"]
+    if ride_key:
+        parts.append(str(ride_key).replace(":", "_"))
+    parts.append(key)
+    if station_id:
+        parts.append(str(station_id))
+    return "_".join(parts)
+
+
 def parse_utc(value: Any) -> datetime | None:
     if not value or not isinstance(value, str):
         return None
