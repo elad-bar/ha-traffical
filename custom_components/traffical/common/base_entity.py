@@ -6,8 +6,10 @@ and value resolution in ``models/entity_values``.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -16,6 +18,8 @@ from ..models.entity_specs import SCOPE_HUB, SCOPE_STATION, EntitySpec
 from ..models.entity_values import EntityContext, EntityValueResolver
 from .entity_descriptions import get_entity_description
 from .helpers import entity_object_id
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class TrafficalEntity(CoordinatorEntity[TrafficalCoordinator]):
@@ -43,15 +47,29 @@ class TrafficalEntity(CoordinatorEntity[TrafficalCoordinator]):
         if station_id:
             parts.append(station_id)
         self._attr_unique_id = "_".join(parts)
-        self.entity_id = (
+        self._desired_entity_id = (
             f"{spec.platform}.{entity_object_id(spec.key, ride_key, station_id)}"
         )
+        self.entity_id = self._desired_entity_id
         info = (
             coordinator.hub_device_info()
             if ride_key is None
             else coordinator.ride_device_info(ride_key)
         )
         self._attr_device_info = DeviceInfo(**info)
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        desired = self._desired_entity_id
+        current = self.entity_id
+        if current == desired:
+            return
+        registry = er.async_get(self.hass)
+        if registry.async_is_registered(desired):
+            _LOGGER.debug(f"entity id {desired} taken, keeping the current one")
+            return
+        _LOGGER.debug(f"entity id rename {current} → {desired}")
+        registry.async_update_entity(current, new_entity_id=desired)
 
     @property
     def _entity_ctx(self) -> EntityContext:

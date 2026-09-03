@@ -113,7 +113,7 @@ Entities on each ride device:
 
 **No assignment today** (weekend, holiday, not coming, empty list): the ride device stays in the registry and goes **unavailable**. Do not delete and recreate it.
 
-`{ride}` in entity ids below is `{routeId}_{direction}` (the suggested object id), not the daily `rideId` and not the Hebrew ride name. Stations are `geo_location.traffical_{ride}_stop_{stationId}`. Existing installs keep old `entity_id`s until those entities are removed from the registry.
+`{ride}` in entity ids below is `{routeId}_{direction}` (the suggested object id), not the daily `rideId` and not the Hebrew ride name. Stations are `geo_location.traffical_{ride}_stop_{stationId}`. Leftover ids from the transliterated-name scheme are renamed when the entity is added.
 
 ---
 
