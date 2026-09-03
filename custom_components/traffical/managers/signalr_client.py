@@ -99,6 +99,23 @@ class SignalRHubs:
         self._dashboard_diag: dict[str, Any] = {}
         self._mobile_diag: dict[str, Any] = {}
 
+    def _session_closed(self) -> bool:
+        return bool(getattr(self.session, "closed", False))
+
+    def _session_dead_error(self, exc: BaseException) -> bool:
+        return self._session_closed() or (
+            isinstance(exc, RuntimeError) and str(exc) == "Session is closed"
+        )
+
+    async def _await_cancelled(self, task: asyncio.Task[None]) -> None:
+        try:
+            await task
+        except asyncio.CancelledError:
+            if not task.done():
+                raise
+        except Exception:
+            pass
+
     def _ws_open(self, ws: aiohttp.ClientWebSocketResponse | None) -> bool:
         return ws is not None and not ws.closed
 
@@ -180,6 +197,8 @@ class SignalRHubs:
 
     async def start_mobile(self, on_event: OnEvent) -> None:
         """Keep the user-scoped ride-list hub connected."""
+        if self._session_closed():
+            return
         await self.stop_mobile()
         self._mobile_on_event = on_event
         self._mobile_closed.clear()
@@ -199,15 +218,14 @@ class SignalRHubs:
         self._mobile_task = None
         if task is not None and not task.done():
             task.cancel()
-            try:
-                await task
-            except (asyncio.CancelledError, Exception):
-                pass
+            await self._await_cancelled(task)
         if ws is not None or task is not None:
             _LOGGER.info("SignalR mobile disconnected")
 
     async def restart(self) -> None:
         """Reconnect active hubs after the authenticated identity changes."""
+        if self._session_closed():
+            return
         mobile_on_event = self._mobile_on_event
         track_on_event = self._on_event
         ride_id = self.track_ride_id
@@ -217,6 +235,8 @@ class SignalRHubs:
             await self.start_track(ride_id, track_on_event)
 
     async def start_track(self, ride_id: int, on_event: OnEvent) -> None:
+        if self._session_closed():
+            return
         await self.stop_track()
         self._on_event = on_event
         self.track_ride_id = ride_id
@@ -237,10 +257,7 @@ class SignalRHubs:
         self._task = None
         if task is not None and not task.done():
             task.cancel()
-            try:
-                await task
-            except (asyncio.CancelledError, Exception):
-                pass
+            await self._await_cancelled(task)
         if ws is not None or task is not None:
             # Frame tally makes "the hub pushed nothing" verifiable instead of
             # inferred from an absence of log lines.
@@ -250,17 +267,19 @@ class SignalRHubs:
             )
 
     async def _run_dashboard(self, ride_id: int) -> None:
-        while not self._closed.is_set():
+        while not self._closed.is_set() and not self._session_closed():
             try:
                 await self._connect_and_listen(ride_id)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 self._dashboard_diag["last_error"] = _redact(str(exc))
+                if self._session_dead_error(exc):
+                    return
                 _LOGGER.exception("Dashboard hub failed")
             finally:
                 self._ws = None
-            if self._closed.is_set():
+            if self._closed.is_set() or self._session_closed():
                 return
             _LOGGER.warning(
                 f"SignalR reconnecting hub={DASHBOARD_HUB} in={HUB_RECONNECT_S:g}s"
@@ -269,19 +288,23 @@ class SignalRHubs:
                 await asyncio.wait_for(self._closed.wait(), HUB_RECONNECT_S)
             except asyncio.TimeoutError:
                 pass
+            if self._session_closed():
+                return
 
     async def _run_mobile(self) -> None:
-        while not self._mobile_closed.is_set():
+        while not self._mobile_closed.is_set() and not self._session_closed():
             try:
                 await self._connect_mobile()
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 self._mobile_diag["last_error"] = _redact(str(exc))
+                if self._session_dead_error(exc):
+                    return
                 _LOGGER.exception("Mobile hub failed")
             finally:
                 self._mobile_ws = None
-            if self._mobile_closed.is_set():
+            if self._mobile_closed.is_set() or self._session_closed():
                 return
             _LOGGER.warning(
                 f"SignalR reconnecting hub={MOBILE_HUB} in={HUB_RECONNECT_S:g}s"
@@ -290,6 +313,8 @@ class SignalRHubs:
                 await asyncio.wait_for(self._mobile_closed.wait(), HUB_RECONNECT_S)
             except asyncio.TimeoutError:
                 pass
+            if self._session_closed():
+                return
 
     async def _negotiate(
         self, hub_url: str, token: str, diag: dict[str, Any]

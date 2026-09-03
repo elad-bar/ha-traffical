@@ -89,6 +89,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.mobile = mobile
         self.hubs = hubs
         self._session = session
+        self._stopping = False
         self._reauth_started = False
         self._entity_listeners: list[Callable[[], None]] = []
         self._route_refresh_task: asyncio.Task[None] | None = None
@@ -136,14 +137,17 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_start(self) -> None:
         _LOGGER.info("coordinator starting")
         await self.async_config_entry_first_refresh()
-        await self.hubs.start_mobile(self._on_mobile_hub_event)
+        if not self._stopping:
+            await self.hubs.start_mobile(self._on_mobile_hub_event)
         self._register_devices()
 
     async def async_stop(self) -> None:
+        self._stopping = True
         _LOGGER.info("coordinator stopping")
         if self._route_refresh_task is not None:
             self._route_refresh_task.cancel()
             self._route_refresh_task = None
+        await self.async_shutdown()
         await self.hubs.stop_mobile()
         await self.hubs.stop_track()
         await self._session.close()
@@ -208,7 +212,8 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.store.set_tokens(body)
         self._persist_entry()
         _LOGGER.info("Access token refreshed")
-        await self.hubs.restart()
+        if not self._stopping:
+            await self.hubs.restart()
         return True
 
     def _persist_entry(self) -> None:
@@ -455,6 +460,8 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _sync_signalr(
         self, live_key: str | None, rides: dict[str, dict[str, Any]]
     ) -> None:
+        if self._stopping:
+            return
         if live_key is None:
             if self.hubs.track_ride_id is not None:
                 await self.hubs.stop_track()
@@ -697,7 +704,8 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.store.set_tokens(body)
         self.store.data["child_id"] = child_id
         self._persist_entry()
-        await self.hubs.restart()
+        if not self._stopping:
+            await self.hubs.restart()
         await self.async_request_refresh()
 
     async def async_action(self, action: str, ride_key: str | None = None) -> None:

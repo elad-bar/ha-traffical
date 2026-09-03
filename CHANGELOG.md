@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.2] - 2026-09-03
+
+### Fixed
+
+- Stop SignalR from retrying negotiate after the integration is removed (`RuntimeError: Session is closed`)
+
 ## [0.1.1] - 2026-09-03
 
 ### Changed

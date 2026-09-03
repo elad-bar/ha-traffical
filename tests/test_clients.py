@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -127,6 +129,58 @@ async def test_mobile_hub_decodes_json_string_event() -> None:
             {"Id": 39306112, "Status": "OngoingMonitored"},
         )
     ]
+
+
+class _ClosedNegotiate:
+    async def __aenter__(self):
+        raise RuntimeError("Session is closed")
+
+    async def __aexit__(self, *args):
+        return False
+
+
+class _ClosingSession:
+    def __init__(self) -> None:
+        self.closed = False
+        self.posts = 0
+
+    def post(self, url, **kwargs):
+        self.posts += 1
+        return _ClosedNegotiate()
+
+
+@pytest.mark.asyncio
+async def test_start_mobile_skips_closed_session() -> None:
+    session = _ClosingSession()
+    session.closed = True
+    hubs = SignalRHubs(
+        session,  # type: ignore[arg-type]
+        "https://api.example",
+        lambda: {"access_token": "token"},
+    )
+    await hubs.start_mobile(lambda *_: None)
+    assert hubs._mobile_task is None
+    assert session.posts == 0
+
+
+@pytest.mark.asyncio
+async def test_mobile_hub_exits_when_session_closed() -> None:
+    session = _ClosingSession()
+    hubs = SignalRHubs(
+        session,  # type: ignore[arg-type]
+        "https://api.example",
+        lambda: {"access_token": "token"},
+    )
+    with patch(
+        "custom_components.traffical.managers.signalr_client.HUB_RECONNECT_S",
+        0,
+    ):
+        await hubs.start_mobile(lambda *_: None)
+        task = hubs._mobile_task
+        assert task is not None
+        await asyncio.wait_for(task, 1)
+    assert task.done()
+    assert session.posts == 1
 
 
 def test_monitored_path_accepts_live_pascal_case_point() -> None:

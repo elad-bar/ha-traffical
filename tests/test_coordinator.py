@@ -362,3 +362,88 @@ async def test_coordinator_keeps_finished_today_focus_tomorrow(
             assert list_rides.await_count == 2
         finally:
             await coordinator.async_stop()
+
+
+@pytest.mark.asyncio
+async def test_stop_does_not_rearm_signalr(hass: HomeAssistant) -> None:
+    entry = _entry(hass)
+    with (
+        patch(
+            "custom_components.traffical.managers.identity_client.IdentityClient.userinfo",
+            new_callable=AsyncMock,
+            return_value=_USER,
+        ),
+        patch(
+            "custom_components.traffical.managers.identity_client.IdentityClient.refresh",
+            new_callable=AsyncMock,
+            return_value={
+                "access_token": "a2",
+                "refresh_token": "r2",
+                "token_type": "Bearer",
+                "expires_in": 3600,
+            },
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.user_roles",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.passenger_policies",
+            new_callable=AsyncMock,
+            return_value={},
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.list_rides",
+            new_callable=AsyncMock,
+            return_value=[_RIDE],
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.checkin_statuses",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.ride_details",
+            new_callable=AsyncMock,
+            return_value=_DETAILS,
+        ),
+        patch(
+            "custom_components.traffical.managers.mobile_client.MobileClient.monitoring_path",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.start_track",
+            new_callable=AsyncMock,
+        ) as start_track,
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.start_mobile",
+            new_callable=AsyncMock,
+        ) as start_mobile,
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.stop_track",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.stop_mobile",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.traffical.managers.signalr_client.SignalRHubs.restart",
+            new_callable=AsyncMock,
+        ) as restart,
+    ):
+        coordinator = await async_create_coordinator(hass, entry)
+        await coordinator.async_start()
+        mobile_calls = start_mobile.await_count
+        track_calls = start_track.await_count
+        restart_calls = restart.await_count
+        await coordinator.async_stop()
+        await coordinator._sync_signalr(
+            "392681:120", {"392681:120": {"ride_id": 39306112}}
+        )
+        assert await coordinator._refresh_tokens() is True
+        assert start_mobile.await_count == mobile_calls
+        assert start_track.await_count == track_calls
+        assert restart.await_count == restart_calls
