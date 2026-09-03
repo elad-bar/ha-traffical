@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.5] - 2026-09-03
+
+### Added
+
+- Ride calendar legs: Onboarding (ride start to boarding), On-the-way (boarding to drop-off), and ETA (drop-off to ride end)
+
+### Changed
+
+- Ride calendar event titles use the ride device name; `location` is the station address
+
+### Fixed
+
+- Naive Mashcal timestamps are Israel local (`Asia/Jerusalem`), not UTC, so calendar events no longer show three hours late
+
 ## [0.1.4] - 2026-09-03
 
 ### Added

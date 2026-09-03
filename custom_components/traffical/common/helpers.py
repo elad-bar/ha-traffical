@@ -9,10 +9,13 @@ import secrets
 import socket
 import ssl
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import aiohttp
 
 from .consts import HTTP_TIMEOUT
+
+_ISRAEL = ZoneInfo("Asia/Jerusalem")
 
 
 def b64url_nopad(data: bytes) -> str:
@@ -85,6 +88,11 @@ def entity_object_id(
 
 
 def parse_utc(value: Any) -> datetime | None:
+    """Parse an API timestamp to UTC.
+
+    Strings with ``Z`` or an offset keep that zone. Naive Mashcal ride times
+    are Israel local (``Asia/Jerusalem``), not UTC.
+    """
     if not value or not isinstance(value, str):
         return None
     text = value.replace("Z", "+00:00")
@@ -93,5 +101,5 @@ def parse_utc(value: Any) -> datetime | None:
     except ValueError:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=_ISRAEL)
     return dt.astimezone(timezone.utc)

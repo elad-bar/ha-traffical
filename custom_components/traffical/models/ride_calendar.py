@@ -4,15 +4,29 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .rides import Ride
+from .stations import Station
+
+_ISRAEL = ZoneInfo("Asia/Jerusalem")
+
+_KIND_ONBOARDING = "onboarding"
+_KIND_ON_THE_WAY = "on_the_way"
+_KIND_ETA = "eta"
+
+_KIND_LABEL = {
+    _KIND_ONBOARDING: "Onboarding",
+    _KIND_ON_THE_WAY: "On-the-way",
+    _KIND_ETA: "ETA",
+}
 
 
 @dataclass(frozen=True)
 class RideCalendarItem:
-    """One calendar event: a line on one service date."""
+    """One calendar leg on one service date."""
 
     uid: str
     summary: str
@@ -22,6 +36,7 @@ class RideCalendarItem:
     description: str
     service_date: str
     key: str
+    kind: str
 
 
 def events_for_line(
@@ -29,13 +44,14 @@ def events_for_line(
     ride_key: str,
     start: datetime,
     end: datetime,
+    member_id: int | None = None,
 ) -> list[RideCalendarItem]:
-    """Listed occurrences for ``ride_key`` that overlap ``[start, end)``."""
+    """Listed occurrence legs for ``ride_key`` that overlap ``[start, end)``."""
     out: list[RideCalendarItem] = []
     for occ in _line_occurrences(occurrences, ride_key):
-        item = item_from_occurrence(occ)
-        if item is not None and _overlaps(item, start, end):
-            out.append(item)
+        for item in items_from_occurrence(occ, member_id):
+            if _overlaps(item, start, end):
+                out.append(item)
     return out
 
 
@@ -44,8 +60,9 @@ def current_event(
     ride_key: str,
     today: date,
     now: datetime | None = None,
+    member_id: int | None = None,
 ) -> RideCalendarItem | None:
-    """Today's event while it is unfinished or still running, else the next listed day."""
+    """Next unfinished today leg, else the first leg of the next listed day."""
     moment = now or datetime.now(timezone.utc)
     today_iso = today.isoformat()
     today_occ: dict[str, Any] | None = None
@@ -57,39 +74,61 @@ def current_event(
         elif service_date > today_iso:
             later.append(occ)
     if today_occ is not None:
-        item = item_from_occurrence(today_occ)
-        if item is not None:
+        items = items_from_occurrence(today_occ, member_id)
+        if items:
+            upcoming = [item for item in items if item.end > moment]
+            if upcoming:
+                return upcoming[0]
             ride = Ride.from_cache(today_occ)
-            if not ride.is_finished or item.end > moment:
-                return item
+            if not ride.is_finished:
+                return items[-1]
     for occ in later:
-        item = item_from_occurrence(occ)
-        if item is not None:
-            return item
+        items = items_from_occurrence(occ, member_id)
+        if items:
+            return items[0]
     return None
 
 
-def item_from_occurrence(occ: Mapping[str, Any]) -> RideCalendarItem | None:
-    """Build an event from a listed occurrence, including station actuals."""
+def items_from_occurrence(
+    occ: Mapping[str, Any], member_id: int | None = None
+) -> list[RideCalendarItem]:
+    """Onboarding, On-the-way, and ETA legs with a positive duration."""
     ride = Ride.from_cache(occ)
     start = ride.start
-    end = ride.end
     if start is None:
-        return None
-    if end is None:
-        end = start + timedelta(minutes=45)
+        return []
     service_date = str(occ.get("service_date") or start.date().isoformat())
     key = str(occ.get("key") or ride.key or "")
-    return RideCalendarItem(
-        uid=f"{key}:{service_date}",
-        summary=ride.name or key,
-        start=start,
-        end=end,
-        location=_location(ride),
-        description=_description(ride),
-        service_date=service_date,
-        key=key,
-    )
+    title = ride.device_name(member_id) or ride.name or key
+    description = _description(ride)
+    boarding = ride.boarding_station()
+    dropoff = ride.dropoff_station(member_id)
+    board_addr = _address(boarding, ride.passenger_stop)
+    dest_addr = _address(dropoff, ride.passenger_destination)
+    legs: list[tuple[str, datetime | None, datetime | None, str]] = [
+        (_KIND_ONBOARDING, ride.start, ride.boarding_at, board_addr),
+        (_KIND_ON_THE_WAY, ride.boarding_at, ride.dropoff_at, dest_addr),
+        (_KIND_ETA, ride.dropoff_at, ride.end, dest_addr),
+    ]
+    out: list[RideCalendarItem] = []
+    for kind, begin, finish, location in legs:
+        if begin is None or finish is None or finish <= begin:
+            continue
+        label = _KIND_LABEL[kind]
+        out.append(
+            RideCalendarItem(
+                uid=f"{key}:{service_date}:{kind}",
+                summary=f"{title} · {label}",
+                start=begin,
+                end=finish,
+                location=location,
+                description=description,
+                service_date=service_date,
+                key=key,
+                kind=kind,
+            )
+        )
+    return out
 
 
 def _line_occurrences(
@@ -114,22 +153,21 @@ def _overlaps(item: RideCalendarItem, start: datetime, end: datetime) -> bool:
     return item.start < end and item.end > start
 
 
-def _location(ride: Ride) -> str:
-    boarding = ride.boarding_station()
-    if boarding is not None:
-        return boarding.label
-    return ride.passenger_stop
+def _address(station: Station | None, fallback: str) -> str:
+    if station is not None:
+        return station.address or station.name or fallback
+    return fallback
 
 
 def _fmt(moment: datetime | None) -> str:
     if moment is None:
         return "—"
-    return moment.astimezone(timezone.utc).strftime("%H:%M")
+    return moment.astimezone(_ISRAEL).strftime("%H:%M")
 
 
 def _description(ride: Ride) -> str:
     lines = [f"Status: {ride.status or 'scheduled'}"]
-    board = ride.passenger_stop or _location(ride)
+    board = ride.passenger_stop
     dest = ride.passenger_destination
     lines.append(f"Boarding: {board} {_fmt(ride.boarding_at)}")
     if dest:

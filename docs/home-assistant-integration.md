@@ -112,7 +112,7 @@ Entities on each ride device:
 - Boarding / drop-off timestamp sensors
 - Check-in / check-out / not coming buttons
 - Bus `device_tracker`
-- Rides calendar (`calendar.traffical_{ride}_rides`): today’s occurrence (even if finished) plus the next listed day for that line within the 4-day lookahead
+- Rides calendar (`calendar.traffical_{ride}_rides`): today’s occurrence (even if finished) plus the next listed day for that line within the 4-day lookahead — three legs (**Onboarding** `start`→boarding, **On-the-way** boarding→drop-off, **ETA** drop-off→`ride.end`); `location` is the station address
 - Station `geo_location`s (created only for the focus ride: live, else next unfinished today; removed otherwise; state is km from the bus while GPS is live)
 
 **No assignment today** (weekend, holiday, not coming, empty list): the ride device stays in the registry and goes **unavailable**. Do not delete and recreate it.
@@ -153,7 +153,7 @@ Unavailable buttons stay on the device and are greyed out (`available = False`).
 | Entity | Role |
 |--------|------|
 | `sensor.traffical_next_ride` | Next (or current) ride: direction, start, my station, destination, `ride_id`, ticket, `service_date` (may be after today, up to 4 days) |
-| `calendar.traffical_{ride}_rides` | That line only: today’s listed occurrence plus the next cached day (no school-year projection) |
+| `calendar.traffical_{ride}_rides` | That line only: today’s listed occurrence plus the next cached day. Three events when times allow: **Onboarding** (ride start → boarding), **On-the-way** (boarding → drop-off), **ETA** (drop-off → ride end). Titles use the ride device name. `location` is the station **address**. Naive API times are Israel local. |
 | `sensor.traffical_{ride}_status` | `New`, `Ongoing`, `OngoingMonitored`, `Finished`, `FinishedMonitored`, … |
 | `binary_sensor.traffical_{ride}_checked_in` | From `CheckIn/GetStatuses` (`checkIn`, `checkInAt`); unknown if `checkIn` is null |
 | `sensor.traffical_{ride}_my_station` | Boarding stop **address** (geocoded `address`; keep raw `name` as a secondary attribute) |

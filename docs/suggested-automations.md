@@ -117,7 +117,7 @@ actions:
 
 ## Get ready (calendar offset)
 
-Each ride device has `calendar.traffical_{ride}_rides` (today plus the next listed day). Offset from that event, and keep a `status == New` condition so a leftover finished event does not fire.
+Each ride device has `calendar.traffical_{ride}_rides` (today plus the next listed day). Offset from the **first** leg (**Onboarding** in the morning, **On-the-way** when boarding is at ride start). Keep a `status == New` condition so a leftover finished event does not fire.
 
 ```yaml
 alias: Traffical — morning get ready

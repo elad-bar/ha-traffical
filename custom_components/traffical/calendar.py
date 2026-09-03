@@ -39,6 +39,7 @@ class TrafficalCalendar(TrafficalEntity, CalendarEntity):
             (self.coordinator.data or {}).get("occurrences") or [],
             self.ride_key or "",
             date.today(),
+            member_id=self.coordinator.member_id(),
         )
         return _ha_event(item) if item is not None else None
 
@@ -55,6 +56,7 @@ class TrafficalCalendar(TrafficalEntity, CalendarEntity):
                 self.ride_key or "",
                 start_date,
                 end_date,
+                member_id=self.coordinator.member_id(),
             )
         ]
 
