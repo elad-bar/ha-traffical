@@ -36,6 +36,7 @@ class EntitySpec:
     state_class: str | None = None
     icon: str | None = None
     entity_category: str | None = None  # config | diagnostic
+    enabled_default: bool = True  # False → user must enable in the entity registry
     when: str | None = None  # creation gate, e.g. policy:gotOnRideReport
     availability: str | None = None  # named availability rule
     action: str | None = None  # coordinator action for button presses
@@ -155,6 +156,7 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
         when="policy:gotOnRideReport",
         availability="can_check_in",
         icon="mdi:login",
+        enabled_default=False,
     ),
     EntitySpec(
         key="check_out",
@@ -164,6 +166,7 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
         when="policy:gotOnRideReport",
         availability="can_check_out",
         icon="mdi:logout",
+        enabled_default=False,
     ),
     EntitySpec(
         key="not_coming",

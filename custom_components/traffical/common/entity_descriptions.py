@@ -59,6 +59,8 @@ def get_entity_description(spec: EntitySpec) -> EntityDescription:
         category = _ENTITY_CATEGORY.get(spec.entity_category)
         if category is not None:
             base["entity_category"] = category
+    if not spec.enabled_default:
+        base["entity_registry_enabled_default"] = False
 
     platform = spec.platform
     if platform == "sensor":

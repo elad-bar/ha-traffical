@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Ride device title is `Traffical {from address} - {to address}` (passenger pickup and drop-off), not the shared line name
+- Check-in and check-out buttons are disabled by default; enable them in the entity registry to use them
 - Station map pins show distance from the live bus (km) instead of staying unknown
 - Ride calendar is per line (`calendar.traffical_{ride}_rides`): today’s listed occurrence plus the next cached day, not a hub school-year projection
 

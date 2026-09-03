@@ -160,6 +160,13 @@ def test_policy_gate_hides_report_buttons() -> None:
     assert with_policy == {"refresh", "check_in", "check_out"}
 
 
+def test_check_in_out_disabled_by_default() -> None:
+    assert _spec("check_in").enabled_default is False
+    assert _spec("check_out").enabled_default is False
+    assert _spec("not_coming").enabled_default is True
+    assert _spec("refresh").enabled_default is True
+
+
 @pytest.mark.parametrize(
     ("key", "expected"),
     [

@@ -134,7 +134,7 @@ These are **entities**, not required YAML services. Presses call the same APIs. 
 | `button.traffical_{ride}_check_out` | Ride | Same endpoint, `checkIn: false` | Same policy, currently checked in |
 | `button.traffical_{ride}_not_coming` | Ride | `PUT /api/Mobile/Route/Change/RemovePassenger` | `notComingReport.isActive`, ride still `New`, inside `limitBeforeRide` if that limit is active |
 
-Unavailable buttons stay on the device and are greyed out (`available = False`). Do not create check-in / not-coming buttons if the corresponding policy is off.
+Unavailable buttons stay on the device and are greyed out (`available = False`). Do not create check-in / not-coming buttons if the corresponding policy is off. Check-in and check-out are **disabled in the entity registry by default**; enable them in Home Assistant to use them. Already-registered entities keep their current enabled state.
 
 ### Child select
 
