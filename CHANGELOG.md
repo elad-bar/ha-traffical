@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.1.4] - 2026-09-03
 
+### Changed
+
+- Ride device title is `Traffical {from address} - {to address}` (passenger pickup and drop-off), not the shared line name
+
 ### Fixed
 
 - Rename entity ids restored from the registry (including after remove and re-add) onto the id-based scheme when the entity is added

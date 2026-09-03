@@ -126,6 +126,10 @@ class Ride:
         return str(self._info.get("passengerStationName") or "")
 
     @property
+    def passenger_destination(self) -> str:
+        return str(self._info.get("passengerDestinationName") or "")
+
+    @property
     def stations(self) -> list[Station]:
         raw = self._details.get("stations")
         if not isinstance(raw, list):
@@ -138,6 +142,26 @@ class Ride:
             if station.is_yours(stop, member_id):
                 return station
         return None
+
+    def dropoff_station(self, _member_id: int | None = None) -> Station | None:
+        """Passenger drop-off by destination name, not the school ``isTarget`` stop."""
+        dest = self.passenger_destination.strip()
+        if not dest:
+            return None
+        for station in self.stations:
+            if station.name == dest:
+                return station
+        return None
+
+    def device_name(self, member_id: int | None = None) -> str:
+        """Friendly HA device title from from/to addresses, or empty."""
+        pickup = self.your_station(member_id)
+        dropoff = self.dropoff_station(member_id)
+        from_addr = pickup.address if pickup is not None else ""
+        to_addr = dropoff.address if dropoff is not None else ""
+        if not from_addr or not to_addr:
+            return ""
+        return f"Traffical {from_addr} - {to_addr}"
 
     def target_station(self) -> Station | None:
         for station in self.stations:

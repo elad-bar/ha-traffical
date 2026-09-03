@@ -285,6 +285,79 @@ def test_ride_from_cache_round_trips() -> None:
     assert Ride.from_cache(None).key is None
 
 
+def test_ride_device_name_afternoon_uses_addresses_not_is_target() -> None:
+    row = {
+        "name": "צורן /קדימה-רציף בשטח היסעים:12",
+        "rideInfo": {
+            "routeId": 428988,
+            "direction": 121,
+            "passengerStationName": "חקלאי הכפר הירוק - רמת השרון",
+            "passengerDestinationName": "השומרון 11, קדימה-צורן, ישראל",
+        },
+    }
+    details = {
+        "stations": [
+            {
+                "name": "חקלאי הכפר הירוק - רמת השרון",
+                "address": "הכפר הירוק, רמת השרון, ישראל",
+                "isTarget": True,
+            },
+            {
+                "name": "השומרון 11, קדימה-צורן, ישראל",
+                "address": "הרצוג 7, קדימה-צורן, ישראל",
+                "isTarget": False,
+            },
+        ]
+    }
+    ride = Ride(row, details)
+
+    assert ride.passenger_destination == "השומרון 11, קדימה-צורן, ישראל"
+    assert ride.target_station() is not None
+    assert ride.target_station().address == "הכפר הירוק, רמת השרון, ישראל"
+    assert ride.device_name() == (
+        "Traffical הכפר הירוק, רמת השרון, ישראל - הרצוג 7, קדימה-צורן, ישראל"
+    )
+
+
+def test_ride_device_name_morning_home_to_school() -> None:
+    row = {
+        "rideInfo": {
+            "passengerStationName": "השומרון 11, קדימה-צורן, ישראל",
+            "passengerDestinationName": "חקלאי הכפר הירוק - רמת השרון",
+        }
+    }
+    details = {
+        "stations": [
+            {
+                "name": "השומרון 11, קדימה-צורן, ישראל",
+                "address": "הרצוג 9, קדימה-צורן, ישראל",
+            },
+            {
+                "name": "חקלאי הכפר הירוק - רמת השרון",
+                "address": "הכפר הירוק, רמת השרון, ישראל",
+                "isTarget": True,
+            },
+        ]
+    }
+
+    assert Ride(row, details).device_name() == (
+        "Traffical הרצוג 9, קדימה-צורן, ישראל - הכפר הירוק, רמת השרון, ישראל"
+    )
+
+
+def test_ride_device_name_empty_without_station_addresses() -> None:
+    row = {
+        "name": "Line",
+        "rideInfo": {
+            "passengerStationName": "Home",
+            "passengerDestinationName": "School",
+        },
+    }
+
+    assert Ride(row, {"name": "Line"}).device_name() == ""
+    assert Ride(row, {"name": "Line"}).device_name() or row["name"] == "Line"
+
+
 def test_store_tokens(tmp_path) -> None:
     store = SessionStore(tmp_path / "config.json")
     store.apply_live_hosts()

@@ -648,6 +648,10 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return None
         return station.lat, station.lng
 
+    def _ride_device_name(self, key: str, ride: dict[str, Any]) -> str:
+        titled = Ride.from_cache(ride).device_name(self.member_id())
+        return titled or ride.get("name") or key
+
     def _register_devices(self) -> None:
         registry = dr.async_get(self.hass)
         hub_id = self.hub_id
@@ -662,7 +666,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             model="Account",
         )
         for key, ride in (self.data.get("rides") or {}).items():
-            slug = ride.get("name") or key
+            slug = self._ride_device_name(key, ride)
             registry.async_get_or_create(
                 config_entry_id=self.entry.entry_id,
                 identifiers={(DOMAIN, f"{hub_id}:{key}")},
@@ -687,7 +691,7 @@ class TrafficalCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @callback
     def ride_device_info(self, key: str) -> dict[str, Any]:
         ride = self.ride(key)
-        slug = ride.get("name") or key
+        slug = self._ride_device_name(key, ride)
         return {
             "identifiers": {(DOMAIN, f"{self.hub_id}:{key}")},
             "via_device": (DOMAIN, self.hub_id),

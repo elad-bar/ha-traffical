@@ -104,6 +104,8 @@ A Traffical **`rideId` is a one-day instance**. Do **not** create a new HA devic
 
 Entity ids stay stable (`device_tracker.traffical_392681_120_bus`). The coordinator writes **today’s** `rideId`, ticket, times, and stations onto that device. A finished today occurrence is not replaced by the next day’s `New` instance until the calendar date rolls.
 
+Friendly name is `Traffical {from address} - {to address}` once ride details have stations: pickup is the passenger stop (`your_station` address), drop-off is the station whose **name** matches `passengerDestinationName` (not `isTarget`). Until then, fall back to the Traffical line `name`, then `routeId:direction`. Two directions of the same line therefore get different titles. Entity ids stay `{routeId}_{direction}` and do not use this title.
+
 Entities on each ride device:
 
 - Status, check-in, driver, vehicle
